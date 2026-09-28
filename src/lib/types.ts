@@ -65,6 +65,8 @@ export interface Confession {
   likes: number
   ipHash: string | null
   createdAt: string
+  reactionCounts?: Record<string, number>
+  myReactions?: string[]
 }
 
 export interface Visit {

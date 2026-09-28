@@ -17,9 +17,12 @@ import {
   Calendar,
   Archive,
   Pin,
+  CalendarPlus,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -113,23 +116,59 @@ export function ArchiveSection() {
     })
   }
 
+  function handleDownloadICS() {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('gw94_access_token') || '' : ''
+    fetch('/api/events/ical', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('下载失败')
+        return res.blob()
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'guanwang94-events.ics'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        toast.success('已下载日历文件，可导入 Google/Apple/Outlook Calendar')
+      })
+      .catch(() => toast.error('下载失败，请稍后重试'))
+  }
+
   return (
     <section
       id="archive"
       className="mx-auto w-full max-w-4xl scroll-mt-20 px-4 py-12 sm:px-6 lg:px-8 lg:py-16"
     >
       {/* 标题 */}
-      <div className="mb-6">
-        <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-          <Archive className="size-3.5" />
-          Archive · 事件归档
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <Archive className="size-3.5" />
+            Archive · 事件归档
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            事件归档时间线
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            按月份回溯班级的每一个重要时刻
+          </p>
         </div>
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          事件归档时间线
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          按月份回溯班级的每一个重要时刻
-        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadICS}
+          className="h-10 shrink-0 gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-600/10 dark:text-emerald-300"
+        >
+          <CalendarPlus className="size-4" />
+          <span className="hidden sm:inline">订阅日历</span>
+          <span className="sm:hidden">日历</span>
+        </Button>
       </div>
 
       {isLoading ? (

@@ -12,7 +12,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, Trash2, Loader2, Send, MessageCircleHeart } from 'lucide-react'
+import { Heart, Trash2, Loader2, Send, MessageCircleHeart, SmilePlus } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,8 @@ import {
   createConfession,
   likeConfession,
   deleteConfession,
+  toggleConfessionReaction,
+  type ReactionEmoji,
 } from '@/lib/api'
 import type { Confession, ConfessionType, ConfessionColor } from '@/lib/types'
 import { relativeTime, formatNumber } from '@/lib/format'
@@ -38,6 +40,9 @@ import { cn } from '@/lib/utils'
 import { EmptyState, CardSkeleton } from '@/components/empty-state'
 
 const MAX_CONTENT = 300
+
+// emoji 反应列表
+const REACTION_EMOJIS: ReactionEmoji[] = ['👍', '❤️', '🎉', '🚀', '😢', '😮']
 
 // ===== 类型配置 =====
 interface TypeConfig {
@@ -146,20 +151,31 @@ function ConfessionCard({
   confession,
   isAdmin,
   onLike,
+  onReact,
   onDelete,
 }: {
   confession: Confession
   isAdmin: boolean
   onLike: (id: string) => void
+  onReact: (id: string, emoji: ReactionEmoji) => void
   onDelete: (id: string) => void
 }) {
   const cfg = configOf(confession.type)
   const [liked, setLiked] = React.useState(false)
   const [pop, setPop] = React.useState(false)
+  const [showReactions, setShowReactions] = React.useState(false)
+  const [localCounts, setLocalCounts] = React.useState<Record<string, number>>(
+    confession.reactionCounts || {},
+  )
+  const [myReactions, setMyReactions] = React.useState<string[]>(
+    confession.myReactions || [],
+  )
 
   React.useEffect(() => {
     setLiked(isLiked(confession.id))
-  }, [confession.id])
+    setLocalCounts(confession.reactionCounts || {})
+    setMyReactions(confession.myReactions || [])
+  }, [confession.id, confession.reactionCounts, confession.myReactions])
 
   function handleLike() {
     if (liked) {
@@ -171,6 +187,25 @@ function ConfessionCard({
     setPop(true)
     setTimeout(() => setPop(false), 400)
     onLike(confession.id)
+  }
+
+  function handleReact(emoji: ReactionEmoji) {
+    const has = myReactions.includes(emoji)
+    // 乐观更新
+    setLocalCounts((prev) => {
+      const next = { ...prev }
+      if (has) {
+        next[emoji] = Math.max(0, (next[emoji] || 0) - 1)
+        if (next[emoji] === 0) delete next[emoji]
+      } else {
+        next[emoji] = (next[emoji] || 0) + 1
+      }
+      return next
+    })
+    setMyReactions((prev) =>
+      has ? prev.filter((e) => e !== emoji) : [...prev, emoji],
+    )
+    onReact(confession.id, emoji)
   }
 
   return (
@@ -244,6 +279,75 @@ function ConfessionCard({
             />
             <span className="tabular-nums">{formatNumber(confession.likes)}</span>
           </button>
+          {/* emoji 反应区 */}
+          <div className="flex flex-wrap items-center gap-1">
+            {REACTION_EMOJIS.map((emoji) => {
+              const count = localCounts[emoji] || 0
+              const mine = myReactions.includes(emoji)
+              if (count === 0 && !mine) return null
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => handleReact(emoji)}
+                  aria-label={`反应 ${emoji}`}
+                  aria-pressed={mine}
+                  className={cn(
+                    'inline-flex h-7 items-center gap-0.5 rounded-full border px-2 text-xs transition-all hover:scale-105',
+                    mine
+                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : 'border-border bg-muted/60 text-muted-foreground hover:border-emerald-500/30 hover:bg-emerald-500/10',
+                  )}
+                >
+                  <span className="text-sm leading-none">{emoji}</span>
+                  {count > 0 && (
+                    <span className="tabular-nums text-[11px]">{count}</span>
+                  )}
+                </button>
+              )
+            })}
+            {/* 展开全部 emoji 选择 */}
+            <button
+              type="button"
+              onClick={() => setShowReactions((v) => !v)}
+              aria-label="更多反应"
+              aria-expanded={showReactions}
+              className={cn(
+                'inline-flex h-7 items-center gap-0.5 rounded-full border border-dashed border-border px-2 text-xs transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/5',
+                showReactions && 'border-emerald-500/40 bg-emerald-500/5',
+              )}
+            >
+              <SmilePlus className="size-3.5" />
+            </button>
+            {showReactions && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-0.5 rounded-full border border-border bg-card p-0.5 shadow-sm"
+              >
+                {REACTION_EMOJIS.map((emoji) => {
+                  const mine = myReactions.includes(emoji)
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        handleReact(emoji)
+                        setShowReactions(false)
+                      }}
+                      aria-label={`添加反应 ${emoji}`}
+                      className={cn(
+                        'inline-flex size-7 items-center justify-center rounded-full text-sm transition-all hover:scale-125 hover:bg-muted',
+                        mine && 'bg-emerald-500/15',
+                      )}
+                    >
+                      {emoji}
+                    </button>
+                  )
+                })}
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -362,7 +466,38 @@ export function ConfessionSection() {
     },
   })
 
-  // 删除 mutation
+  // emoji 反应 mutation
+  const reactMut = useMutation({
+    mutationFn: ({ id, emoji }: { id: string; emoji: ReactionEmoji }) =>
+      toggleConfessionReaction(id, emoji),
+    onSuccess: (data, { id }) => {
+      // 用后端返回的最新 counts/myReactions 同步到 cache
+      const prev = qc.getQueryData<{ items: Confession[]; total: number }>([
+        'confessions',
+        filterType,
+        sort,
+      ])
+      if (prev) {
+        const next = {
+          ...prev,
+          items: prev.items.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  reactionCounts: data.counts,
+                  myReactions: data.myReactions,
+                }
+              : c,
+          ),
+        }
+        qc.setQueryData(['confessions', filterType, sort], next)
+      }
+    },
+    onError: () => {
+      toast.error('反应失败')
+      qc.invalidateQueries({ queryKey: ['confessions'] })
+    },
+  })
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteConfession(id),
     onSuccess: () => {
@@ -578,6 +713,7 @@ export function ConfessionSection() {
                   confession={c}
                   isAdmin={isAdmin}
                   onLike={(id) => likeMut.mutate(id)}
+                  onReact={(id, emoji) => reactMut.mutate({ id, emoji })}
                   onDelete={(id) => deleteMut.mutate(id)}
                 />
               ))}

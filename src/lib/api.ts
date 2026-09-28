@@ -398,6 +398,23 @@ export function likeConfession(id: string): Promise<LikeResponse> {
   return apiPatch<LikeResponse>('/api/confessions/like', { id })
 }
 
+// ===== 表白墙 emoji 反应 =====
+export type ReactionEmoji = '👍' | '❤️' | '🎉' | '🚀' | '😢' | '😮'
+
+export interface ReactionToggleResponse {
+  ok: true
+  counts: Record<string, number>
+  myReactions: string[]
+  toggled: boolean
+}
+
+export function toggleConfessionReaction(
+  confessionId: string,
+  emoji: ReactionEmoji,
+): Promise<ReactionToggleResponse> {
+  return apiPatch<ReactionToggleResponse>('/api/confessions/react', { confessionId, emoji })
+}
+
 export function deleteConfession(id: string): Promise<OkResponse> {
   return apiDelete<OkResponse>('/api/confessions/delete', { id })
 }

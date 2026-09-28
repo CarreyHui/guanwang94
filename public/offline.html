@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>离线 · 九四班官网</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: oklch(0.99 0.005 165);
+      color: oklch(0.18 0.02 165);
+    }
+    .container {
+      max-width: 28rem;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: oklch(0.62 0.17 162 / 0.1);
+      color: oklch(0.5 0.15 162);
+      margin-bottom: 1.5rem;
+    }
+    .badge::before {
+      content: "";
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 9999px;
+      background: oklch(0.62 0.17 162);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    h1 {
+      font-size: 1.875rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: oklch(0.3 0.13 162);
+    }
+    p {
+      color: oklch(0.5 0.02 165);
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+    .actions {
+      margin-top: 2rem;
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    button, a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 2.75rem;
+      padding: 0 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:hover, a:hover { opacity: 0.9; }
+    .primary {
+      background: oklch(0.62 0.17 162);
+      color: white;
+      border: none;
+    }
+    .secondary {
+      background: transparent;
+      color: oklch(0.3 0.13 162);
+      border: 1px solid oklch(0.62 0.17 162 / 0.3);
+    }
+    .footer {
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: oklch(0.55 0.02 165);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">离线模式</span>
+    <h1>暂时无法连接网络</h1>
+    <p>你目前处于离线状态，无法获取最新数据。</p>
+    <p>已缓存的页面仍然可以浏览，等网络恢复后自动同步。</p>
+    <div class="actions">
+      <button class="primary" onclick="location.reload()">重试连接</button>
+      <a class="secondary" href="/">回到首页</a>
+    </div>
+    <p class="footer">© 2026 九四班官网 · Guanwang94</p>
+  </div>
+  <script>
+    // 监听网络恢复
+    window.addEventListener('online', () => location.reload())
+  </script>
+</body>
+</html>

@@ -21,6 +21,8 @@ import {
   BookOpen,
   ListTree,
   Sparkles,
+  CalendarPlus,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -107,6 +109,18 @@ export function EventDetailModal() {
   const [loading, setLoading] = React.useState(false)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
   const [related, setRelated] = React.useState<Event[]>([])
+  const [scrollPct, setScrollPct] = React.useState(0)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget
+    const max = el.scrollHeight - el.clientHeight
+    if (max <= 0) {
+      setScrollPct(0)
+      return
+    }
+    setScrollPct(Math.min(100, Math.max(0, (el.scrollTop / max) * 100)))
+  }
 
   // 打开时拉取详情
   React.useEffect(() => {
@@ -147,9 +161,12 @@ export function EventDetailModal() {
     }
   }, [open, selectedId, closeEvent])
 
-  // 关闭 lightbox 也跟随关闭
+  // 关闭 lightbox 也跟随关闭 + 重置进度
   React.useEffect(() => {
-    if (!open) setLightboxOpen(false)
+    if (!open) {
+      setLightboxOpen(false)
+      setScrollPct(0)
+    }
   }, [open])
 
   async function handleShare() {
@@ -182,6 +199,85 @@ export function EventDetailModal() {
     if (typeof window !== 'undefined') window.print()
   }
 
+  // 加入日历（生成单个事件 .ics 文件并下载）
+  function handleAddToCalendar() {
+    if (!event) return
+    try {
+      const start = new Date(event.publishedAt)
+      const end = new Date(start.getTime() + 60 * 60 * 1000)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const fmt = (d: Date) =>
+        d.getUTCFullYear().toString() +
+        pad(d.getUTCMonth() + 1) +
+        pad(d.getUTCDate()) +
+        'T' +
+        pad(d.getUTCHours()) +
+        pad(d.getUTCMinutes()) +
+        pad(d.getUTCSeconds()) +
+        'Z'
+      const esc = (s: string) =>
+        s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n').replace(/\r/g, '')
+      const tags = parseTags(event.tags)
+      const cats = [event.category, ...tags].slice(0, 5).map(esc).join(',')
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Guanwang94//九四班官网//CN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:${event.id}@guanwang94.saozi.cc.cd`,
+        `DTSTAMP:${fmt(new Date())}`,
+        `DTSTART:${fmt(start)}`,
+        `DTEND:${fmt(end)}`,
+        `SUMMARY:${esc(event.title)}`,
+        `DESCRIPTION:${esc(event.summary + '\n\n' + event.content.replace(/[#*`>_~]/g, ''))}`,
+        `CATEGORIES:${cats}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n')
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `gw94-event-${event.id.slice(-6)}.ics`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('已生成日历文件，可导入 Google/Apple/Outlook Calendar')
+    } catch (err) {
+      toast.error('生成日历文件失败')
+    }
+  }
+
+  // 下载全部事件 iCal
+  function handleDownloadAllICS() {
+    if (typeof window === 'undefined') return
+    const token = localStorage.getItem('gw94_access_token') || ''
+    // 通过 fetch 拿 .ics 文件
+    fetch('/api/events/ical', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('下载失败')
+        return res.blob()
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'guanwang94-events.ics'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        toast.success('已下载全部事件日历')
+      })
+      .catch(() => toast.error('下载失败，请稍后重试'))
+  }
+
   const tags = event ? parseTags(event.tags) : []
   const toc = event ? extractToc(event.content) : []
   const readTime = event ? readingTime(event.content) : ''
@@ -207,7 +303,19 @@ export function EventDetailModal() {
             查看事件标题、摘要、正文与相关标签
           </DialogDescription>
 
-          <div className="flex max-h-[92vh] flex-col overflow-y-auto">
+          {/* 顶部阅读进度条 */}
+          <div className="absolute inset-x-0 top-0 z-20 h-1 bg-muted">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 transition-[width] duration-150"
+              style={{ width: `${scrollPct}%` }}
+            />
+          </div>
+
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="flex max-h-[92vh] flex-col overflow-y-auto"
+          >
             {loading && (
               <div className="flex h-72 items-center justify-center text-muted-foreground">
                 <Loader2 className="size-6 animate-spin" />
@@ -429,6 +537,16 @@ export function EventDetailModal() {
                     >
                       <Printer className="size-4" />
                       打印
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddToCalendar}
+                      className="h-9 gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-600/10 dark:text-emerald-300"
+                    >
+                      <CalendarPlus className="size-4" />
+                      加入日历
                     </Button>
                   </div>
                 </div>

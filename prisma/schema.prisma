@@ -52,7 +52,22 @@ model Confession {
   ipHash    String?
   createdAt DateTime @default(now())
 
+  reactions ConfessionReaction[]
+
   @@index([type])
+}
+
+model ConfessionReaction {
+  id           String   @id @default(cuid())
+  confessionId String
+  emoji        String
+  ipHash       String?
+  createdAt    DateTime @default(now())
+
+  confession Confession @relation(fields: [confessionId], references: [id], onDelete: Cascade)
+
+  @@unique([confessionId, ipHash, emoji])
+  @@index([confessionId])
 }
 
 model Visit {

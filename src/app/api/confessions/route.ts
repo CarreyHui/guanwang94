@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
     const orderBy: Prisma.ConfessionOrderByWithRelationInput =
       sort === 'hot' ? { likes: 'desc' } : { createdAt: 'desc' }
 
+    const ipHash = hashIp(req)
+
     const [total, items] = await Promise.all([
       db.confession.count({ where }),
       db.confession.findMany({
@@ -35,10 +37,28 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: {
+          reactions: {
+            select: { emoji: true, ipHash: true },
+          },
+        },
       }),
     ])
 
-    return json({ items, total, page, pageSize })
+    // 聚合每个 confession 的 emoji 计数 + 标记当前用户的反应
+    const itemsWithReactions = items.map((c) => {
+      const counts: Record<string, number> = {}
+      const myReactions: string[] = []
+      for (const r of c.reactions) {
+        counts[r.emoji] = (counts[r.emoji] || 0) + 1
+        if (r.ipHash === ipHash) myReactions.push(r.emoji)
+      }
+      // 删除 reactions 数组，加 reactionCounts + myReactions
+      const { reactions: _omit, ...rest } = c
+      return { ...rest, reactionCounts: counts, myReactions }
+    })
+
+    return json({ items: itemsWithReactions, total, page, pageSize })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)
   }

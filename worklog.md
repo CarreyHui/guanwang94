@@ -323,3 +323,86 @@ Stage Summary:
 - 留言邮件通知（管理员有新留言时邮件提醒）
 - 表白墙 emoji 反应扩展（不只 5 种 type，加 👍/❤️/🎉/🚀 等多反应）
 - 后台「站点配置」加自定义 CSS 主题色（让管理员改主色调，不只 emerald）
+
+---
+Task ID: 7
+Agent: webDevReview 定时巡检 agent（第 3 轮）
+Task: QA + PWA 离线 + 动态 metadata + iCal 日历导出 + 表白墙多反应 + 事件详情阅读进度
+
+Work Log:
+- 读 worklog 了解第 2 轮进度（高级筛选/真分页/站点配置扩展/UA 分布/错误边界全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（5 项）：
+1. **PWA 离线支持**：
+   - 新建 `public/sw.js`：Service Worker，实现 4 种缓存策略
+     - 静态资源（_next/static/图片/css）：Cache First + 后台更新（stale-while-revalidate）
+     - API 请求（GET）：Network First，失败回退缓存
+     - HTML 页面：Network First，失败回退 /offline.html
+     - 外链（picsum.photos 等）：Cache First 不阻塞
+   - 新建 `public/offline.html`：离线兜底页（emerald 主题 + 在线检测自动重载）
+   - 新建 `src/components/sw-register.tsx`：仅生产环境注册 SW（避免 HMR 干扰）+ updatefound 检测新版本 + toast 提示用户刷新
+   - layout.tsx 挂载 `<ServiceWorkerRegister />`
+
+2. **动态 metadata（generateMetadata）**：
+   - layout.tsx 改为 `export async function generateMetadata()`：从 DB 读 SiteConfig（siteTitle/siteDescription/logoUrl/ogImageUrl）
+   - `export const revalidate = 3600`（ISR 1 小时，平衡性能与实时性）
+   - try/catch 兜底：DB 未就绪时用默认值
+   - icon/apple icon 改为动态 logoUrl
+   - openGraph/twitter card 标题/描述/图片全部动态化
+   - 测试：PUT site-config 改 siteTitle 为「九四班官网 · V3 测试」→ 主页 `<title>` 立即变「九四班官网 · V3 测试」✓
+
+3. **事件 iCal 日历导出**：
+   - 新建 `src/lib/ical.ts`：RFC 5545 iCal 生成器（formatICalDate/escapeICalText/foldLine）+ eventToICal 转换器
+   - 新建 API `/api/events/ical` GET：返回 .ics 文件（Content-Type: text/calendar），支持 category/tag/limit 过滤，最多 100 条
+   - 前端 `event-detail-modal.tsx` 加「加入日历」按钮（CalendarPlus 图标）：生成单个事件 .ics 文件并下载（Blob + a.download），toast 提示「已生成日历文件」
+   - `archive-section.tsx` 标题区加「订阅日历」按钮：调 /api/events/ical 下载全部事件 .ics 文件
+   - 测试：/api/events/ical 返回完整 BEGIN:VCALENDAR + VEVENT ✓，加入日历按钮 toast 成功 ✓
+
+4. **表白墙 emoji 多反应**：
+   - Prisma schema 加 `ConfessionReaction` 表（confessionId/emoji/ipHash，@@unique 防重复）
+   - 新建 API `/api/confessions/react` GET（取统计）/ PATCH（切换反应，6 种 emoji 白名单：👍❤️🎉🚀😢😮）
+   - `api/confessions` GET 列表路由改为 `include: { reactions }`，聚合返回 `reactionCounts` + `myReactions`
+   - 前端 api.ts 加 `toggleConfessionReaction` + `ReactionEmoji` 类型
+   - types.ts Confession 加 `reactionCounts?` + `myReactions?` 字段
+   - ConfessionCard 加 emoji 反应区：
+     - 已有反应显示为 chip（emoji + 计数，mine 时 emerald 边框）
+     - 「更多反应」按钮（虚线边框 + SmilePlus 图标）展开 6 emoji 选择器（hover 放大）
+     - 乐观更新 localCounts + myReactions，onSuccess 用后端返回数据同步
+   - 测试：PATCH /api/confessions/react 200 返回 `{"counts":{"👍":1},"myReactions":["👍"],"toggled":true}` ✓
+   - agent-browser 验证：点 👍 emoji 后反应 chip 显示 ✓
+
+5. **事件详情 Modal 阅读进度条**：
+   - 顶部 1px emerald→teal→amber 渐变进度条，跟随 DialogContent 滚动百分比
+   - Modal 关闭时重置 scrollPct 为 0
+   - 用 onScroll handler + scrollContainerRef，rAF-free 直接 setState（足够流畅）
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 表白墙 emoji 选择器 6 emoji 显示 ✓ + 点 👍 反应成功 ✓
+  - 归档 section「订阅日历」按钮显示 ✓
+  - 事件详情 Modal「加入日历」按钮 + toast 成功 ✓
+  - 动态 metadata：主页 title 反映 siteConfig 修改 ✓
+- 后端 API 测试：/api/confessions 返回 reactionCounts/myReactions ✓；/api/confessions/react PATCH 200 ✓；/api/events/ical 返回完整 .ics ✓；site-config PUT 200 + 主页 title 动态更新 ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 5 项新功能（PWA/动态 metadata/iCal 导出/emoji 反应/阅读进度条）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 5 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳），需 setsid -f 保活
+- Service Worker 仅生产环境注册，沙箱 dev 模式无法验证 SW 缓存（但 sw.js 文件本身可访问）
+- 动态 metadata 用 revalidate=3600，1 小时内 siteTitle 修改不会立即反映到所有用户（ISR 缓存）
+- emoji 反应的 ConfessionReaction 表当前空，种子脚本未初始化示例数据（不影响功能）
+- iCal 文件 SUMMARY/DESCRIPTION 用纯文本，复杂 Markdown 可能有不规则字符（已转义）
+
+下一阶段优先事项建议：
+- 站点配置自定义 CSS 主题色（让管理员改主色调，不只 emerald）
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 事件标签云扩展为标签详情页（点击标签进入筛选页 + URL 持久化）
+- 后台批量操作（多选事件批量删除/置顶/改分类）
+- 表白墙热榜（按周/月统计 top10 表白）
+- 访问统计的地理分布（基于 ipHash 不可逆 + 简单地理库）
