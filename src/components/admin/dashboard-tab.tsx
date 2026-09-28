@@ -33,6 +33,8 @@ import {
   Monitor,
   Tablet,
   Globe,
+  UserPlus,
+  UserCheck,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,6 +54,7 @@ import {
   getHourlyStats,
   getTopPaths,
   getTopReferrers,
+  getVisitorTypes,
 } from '@/lib/api'
 import type { OverviewStats, TrendPoint, TopEvent, Visit } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -198,6 +201,10 @@ export function DashboardTab() {
   const topReferrersQuery = useQuery({
     queryKey: ['admin', 'top-referrers', 7, 10],
     queryFn: () => getTopReferrers(7, 10),
+  })
+  const visitorTypesQuery = useQuery({
+    queryKey: ['admin', 'visitor-types', 7],
+    queryFn: () => getVisitorTypes(7),
   })
 
   const trendData = trend.data ?? []
@@ -689,6 +696,79 @@ export function DashboardTab() {
                   共 {topReferrersQuery.data.uniqueReferrers} 个来源，{topReferrersQuery.data.total} 次带 referrer 访问
                 </p>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 新访客 vs 回访 */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <UserPlus className="size-4 text-emerald-600" />
+            新访客 vs 回访（近 7 天）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {visitorTypesQuery.isLoading ? (
+            <CenterSpinner />
+          ) : visitorTypesQuery.isError ? (
+            <EmptyHint hint="加载失败" />
+          ) : !visitorTypesQuery.data || visitorTypesQuery.data.total === 0 ? (
+            <EmptyHint hint="暂无访客数据" />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* 双数字卡 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    <UserPlus className="size-3.5" />
+                    新访客
+                  </div>
+                  <div className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                    {formatNumber(visitorTypesQuery.data.newCount)}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {visitorTypesQuery.data.newPct}% 占比
+                  </div>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                    <UserCheck className="size-3.5" />
+                    回访客
+                  </div>
+                  <div className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                    {formatNumber(visitorTypesQuery.data.returningCount)}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {visitorTypesQuery.data.returningPct}% 占比
+                  </div>
+                </div>
+              </div>
+
+              {/* 比例条 */}
+              <div>
+                <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
+                  <span>新访客 {visitorTypesQuery.data.newPct}%</span>
+                  <span>回访 {visitorTypesQuery.data.returningPct}%</span>
+                </div>
+                <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all"
+                    style={{ width: `${visitorTypesQuery.data.newPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all"
+                    style={{ width: `${visitorTypesQuery.data.returningPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* 独立访客数 */}
+              <p className="border-t pt-2 text-[11px] text-muted-foreground">
+                共 {formatNumber(visitorTypesQuery.data.uniqueVisitors)} 个独立访客，
+                {formatNumber(visitorTypesQuery.data.total)} 次访问
+              </p>
             </div>
           )}
         </CardContent>

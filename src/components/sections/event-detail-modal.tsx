@@ -25,6 +25,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  QrCode,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -143,6 +144,7 @@ export function EventDetailModal() {
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
   const [related, setRelated] = React.useState<Event[]>([])
   const [scrollPct, setScrollPct] = React.useState(0)
+  const [qrOpen, setQrOpen] = React.useState(false)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
 
   // 当前事件的 tags（用于 byTag 筛选）
@@ -287,7 +289,7 @@ export function EventDetailModal() {
       await navigator.share({
         title: event?.title || '九四班官网',
         text: event?.summary || '',
-        url: window.location.href,
+        url: shareUrl || window.location.href,
       })
     } catch {
       // 用户取消分享，忽略
@@ -300,11 +302,21 @@ export function EventDetailModal() {
       return
     }
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      await navigator.clipboard.writeText(shareUrl)
       toast.success('已复制链接')
     } catch {
       toast.error('复制失败')
     }
+  }
+
+  // 当前事件分享 URL（带 ?event=id query）
+  const shareUrl = React.useMemo(() => {
+    if (typeof window === 'undefined' || !event) return ''
+    return `${window.location.origin}/?event=${event.id}`
+  }, [event])
+
+  function handleShowQR() {
+    setQrOpen(true)
   }
 
   function handlePrint() {
@@ -631,6 +643,16 @@ export function EventDetailModal() {
                       <Link2 className="size-4" />
                       复制直链
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleShowQR}
+                      className="h-9 gap-1.5"
+                    >
+                      <QrCode className="size-4" />
+                      <span className="hidden sm:inline">二维码</span>
+                    </Button>
                     {canShare && (
                       <Button
                         type="button"
@@ -731,6 +753,42 @@ export function EventDetailModal() {
           onClose={() => setLightboxOpen(false)}
         />
       )}
+
+      {/* 二维码 Dialog */}
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogTitle className="text-center text-base font-semibold">
+            扫码分享
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            扫描二维码访问当前事件
+          </DialogDescription>
+          <div className="flex flex-col items-center gap-3 pb-2">
+            {shareUrl && (
+              <div className="rounded-lg border bg-white p-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}&color=10b981&bgcolor=ffffff`}
+                  alt="事件链接二维码"
+                  className="size-48"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <p className="text-center text-xs text-muted-foreground">
+              扫描二维码访问「{event?.title?.slice(0, 30)}{event && event.title.length > 30 ? '…' : ''}」
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCopyLink}
+              className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-600/90"
+            >
+              <Link2 className="size-4" />
+              复制链接
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

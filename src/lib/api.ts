@@ -542,6 +542,21 @@ export function getTopReferrers(days = 7, limit = 10): Promise<TopReferrersRespo
   return apiGet<TopReferrersResponse>('/api/stats/top-referrers', { days, limit })
 }
 
+// 新访客 vs 回访
+export interface VisitorTypesResponse {
+  newCount: number
+  returningCount: number
+  total: number
+  newPct: number
+  returningPct: number
+  uniqueVisitors: number
+  days: number
+}
+
+export function getVisitorTypes(days = 7): Promise<VisitorTypesResponse> {
+  return apiGet<VisitorTypesResponse>('/api/stats/visitor-types', { days })
+}
+
 // ===== 上报访问 =====
 export function trackVisit(payload: TrackPayload): Promise<TrackResponse> {
   return apiPost<TrackResponse>('/api/track', payload)

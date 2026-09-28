@@ -25,11 +25,13 @@ import {
   CheckSquare,
   FolderEdit,
   Flag,
+  CalendarClock,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -84,9 +86,10 @@ export function ManageEventsTab() {
   const [page, setPage] = React.useState(1)
   const [delTarget, setDelTarget] = React.useState<Event | null>(null)
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
-  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin' | 'category' | 'priority'>(null)
+  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin' | 'category' | 'priority' | 'publishTime'>(null)
   const [batchCategory, setBatchCategory] = React.useState<string>('班级活动')
   const [batchPriority, setBatchPriority] = React.useState<string>('normal')
+  const [batchPublishTime, setBatchPublishTime] = React.useState<string>('') // ISO datetime
 
   const queryClient = useQueryClient()
   const openEvent = useEventModal((s) => s.openEvent)
@@ -297,6 +300,37 @@ export function ManageEventsTab() {
     },
   })
 
+  // 批量改发布时间 mutation
+  const batchPublishTimeMutation = useMutation({
+    mutationFn: async ({ ids, publishedAt }: { ids: string[]; publishedAt: string }) => {
+      const results: Promise<{ ok: boolean; id: string; err?: string }>[] = []
+      for (const id of ids) {
+        results.push(
+          updateEvent(id, { publishedAt })
+            .then(() => ({ ok: true, id }))
+            .catch((err) => ({ ok: false, id, err: err instanceof Error ? err.message : '失败' })),
+        )
+      }
+      return Promise.all(results)
+    },
+    onSuccess: (results) => {
+      const ok = results.filter((r) => r.ok).length
+      const fail = results.filter((r) => !r.ok).length
+      if (fail === 0) toast.success(`已批量改发布时间 ${ok} 条`)
+      else toast.warning(`成功 ${ok} 条，失败 ${fail} 条`)
+      clearSelection()
+      setBatchConfirm(null)
+      setBatchPublishTime('')
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'events'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-list'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-archive-all'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-pinned'] })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : '批量改发布时间失败')
+    },
+  })
+
   const items = list.data?.items ?? []
   const total = list.data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -389,11 +423,22 @@ export function ManageEventsTab() {
               variant="outline"
               size="sm"
               onClick={() => setBatchConfirm('priority')}
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending}
               className="h-8 gap-1.5 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 dark:text-amber-300"
             >
               <Flag className="size-3.5" />
               批量改优先级
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchConfirm('publishTime')}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending}
+              className="h-8 gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-500/10 dark:text-violet-300"
+            >
+              <CalendarClock className="size-3.5" />
+              批量改时间
             </Button>
             <Button
               type="button"
@@ -632,6 +677,7 @@ export function ManageEventsTab() {
               {batchConfirm === 'unpin' && `确认取消置顶 ${selectedCount} 条事件？`}
               {batchConfirm === 'category' && `批量改分类 ${selectedCount} 条事件`}
               {batchConfirm === 'priority' && `批量改优先级 ${selectedCount} 条事件`}
+              {batchConfirm === 'publishTime' && `批量改发布时间 ${selectedCount} 条事件`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {batchConfirm === 'delete' && '将永久删除选中事件，删除后无法恢复。此操作不可逆。'}
@@ -639,6 +685,7 @@ export function ManageEventsTab() {
               {batchConfirm === 'unpin' && '选中事件将取消置顶状态（已非置顶的会跳过）。'}
               {batchConfirm === 'category' && '选择目标分类，选中事件将全部改为该分类：'}
               {batchConfirm === 'priority' && '选择优先级，选中事件将全部改为该优先级：'}
+              {batchConfirm === 'publishTime' && '选择新发布时间，选中事件将全部改为该时间：'}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -674,10 +721,70 @@ export function ManageEventsTab() {
             </div>
           )}
 
+          {/* 改发布时间的 Input */}
+          {batchConfirm === 'publishTime' && (
+            <div className="space-y-2 py-2">
+              <Input
+                type="datetime-local"
+                value={batchPublishTime}
+                onChange={(e) => setBatchPublishTime(e.target.value)}
+                className="h-11"
+                aria-label="新发布时间"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    const now = new Date()
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    setBatchPublishTime(
+                      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`,
+                    )
+                  }}
+                >
+                  设为现在
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    setBatchPublishTime(
+                      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+                    )
+                  }}
+                >
+                  明天此时
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    const d = new Date(Date.now() - 24 * 60 * 60 * 1000)
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    setBatchPublishTime(
+                      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+                    )
+                  }}
+                >
+                  昨天此时
+                </Button>
+              </div>
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel
               className="h-11"
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending}
             >
               取消
             </AlertDialogCancel>
@@ -688,7 +795,14 @@ export function ManageEventsTab() {
                   ? 'bg-rose-600 hover:bg-rose-600/90'
                   : 'bg-emerald-600 hover:bg-emerald-600/90',
               )}
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending}
+              disabled={
+                batchPinMutation.isPending ||
+                batchDeleteMutation.isPending ||
+                batchCategoryMutation.isPending ||
+                batchPriorityMutation.isPending ||
+                batchPublishTimeMutation.isPending ||
+                (batchConfirm === 'publishTime' && !batchPublishTime)
+              }
               onClick={(e) => {
                 e.preventDefault()
                 const ids = Array.from(selectedIds)
@@ -702,10 +816,14 @@ export function ManageEventsTab() {
                   batchCategoryMutation.mutate({ ids, category: batchCategory })
                 } else if (batchConfirm === 'priority') {
                   batchPriorityMutation.mutate({ ids, priority: batchPriority })
+                } else if (batchConfirm === 'publishTime' && batchPublishTime) {
+                  // datetime-local 转 ISO
+                  const iso = new Date(batchPublishTime).toISOString()
+                  batchPublishTimeMutation.mutate({ ids, publishedAt: iso })
                 }
               }}
             >
-              {batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending ? (
+              {batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   处理中…
