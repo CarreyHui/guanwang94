@@ -19,11 +19,18 @@ export function SiteFooter() {
   return (
     <footer
       className={cn(
-        'mt-auto w-full border-t border-emerald-600/20',
+        'relative mt-auto w-full overflow-hidden border-t border-emerald-600/20',
         'bg-gradient-to-br from-emerald-700 to-teal-700 text-white',
       )}
     >
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-12 lg:px-8">
+      {/* 装饰光晕 */}
+      <div className="pointer-events-none absolute -left-20 -top-20 size-64 rounded-full bg-emerald-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 right-1/4 size-72 rounded-full bg-teal-300/15 blur-3xl" />
+
+      {/* 顶部装饰条 */}
+      <div className="h-1 bg-gradient-to-r from-amber-400 via-emerald-300 to-teal-400" />
+
+      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-12 lg:px-8">
         <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
           {/* 左：Logo + 介绍 */}
           <div className="flex flex-col gap-3">

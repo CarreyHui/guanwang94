@@ -565,3 +565,82 @@ Stage Summary:
 - 表白墙热榜加「类型筛选」（只看表白/感谢/祝福/吐槽/心愿的热榜）
 - 站点配置加自定义 CSS 主题色 hex 输入（不只 6 选 1）
 - PWA service worker 加后台同步（离线发布的表白/留言自动同步）
+
+---
+Task ID: 10
+Agent: webDevReview 定时巡检 agent（第 6 轮）
+Task: QA + 热门路径 Top 10 + 热榜类型筛选 + 批量改优先级 + 标签匹配相关 + Footer 装饰
+
+Work Log:
+- 读 worklog 了解第 5 轮进度（热榜切换/事件翻页/批量改分类/访问热力图/Header 阴影全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（5 项）：
+1. **访问统计热门路径 Top 10**：
+   - 新 API `/api/stats/top-paths`：拉近 7 天所有 visit，按 path 聚合计数排序取 Top N
+   - 前端 api.ts 加 getTopPaths + TopPathItem/TopPathsResponse 类型
+   - dashboard-tab 加「热门路径 Top 10（近 7 天）」Card：
+     - 每行：排名 + path（code font）+ 计数 + emerald→teal 渐变进度条（按 max 归一化）
+     - 底部统计：共 N 个不同路径，M 次访问
+   - 测试：dashboard 显示「共 1 个不同路径，45 次访问」✓
+
+2. **表白墙热榜类型筛选**：
+   - 后端 `/api/confessions/top` 加 type 参数（白名单：confession/thanks/bless/complain/wish）
+   - 前端 api.ts getConfessionTop 加 type 参数 + ConfessionTopResponse 加 type 字段
+   - ConfessionTopBar 加 TYPE_OPTIONS（6 个：全部🌈 + 5 类型）：
+     - 类型筛选放顶部（emoji + 标签，移动端只显示 emoji）
+     - 时间维度切换移到底部（移动端 flex-1 平分，桌面端右对齐）
+     - 选中态 amber 背景 + 白字
+   - 测试：6 类型按钮 + 3 时间按钮全部显示 ✓
+
+3. **后台批量改优先级**：
+   - manage-events-tab 加 batchPriorityMutation（Promise.all 并行 updateEvent 改 priority）
+   - 工具栏加「批量改优先级」按钮（amber 配色 + Flag 图标）
+   - batchConfirm 类型扩展加 'priority'
+   - AlertDialog priority 模式：Select 含「高优先级」/「普通」2 选项
+   - 测试：全选 8 条 → 点批量改优先级 → AlertDialog「批量改优先级 8 条事件」+ Select 默认「普通」✓
+
+4. **事件详情按标签匹配相关推荐**：
+   - event-detail-modal 相关事件逻辑重写：
+     - 拉同分类候选（pageSize 10）+ 按前 3 个标签各拉候选（pageSize 5）
+     - 用 Map 去重，按标签重合度排序（overlap×2 + 同分类+1 + 浏览量归一化+0.5）
+     - 取 Top 3
+   - 相关推荐标题加「（按标签匹配）」说明
+   - 测试：事件详情显示「相关推荐（按标签匹配）」✓
+
+5. **样式增强 - Footer 装饰**：
+   - site-footer 加 relative + overflow-hidden
+   - 顶部装饰条：amber→emerald→teal 渐变 h-1
+   - 2 个装饰光晕：左上 emerald-400/20 + 右下 teal-300/15（blur-3xl）
+   - 内容区加 relative 提升层级
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 表白墙热榜 6 类型 + 3 时间按钮显示 ✓
+  - dashboard 热门路径 Top 10 显示「共 1 个不同路径，45 次访问」✓
+  - 后台批量改优先级 AlertDialog + Select 显示 ✓
+  - 事件详情相关推荐「（按标签匹配）」显示 ✓
+- 后端 API 测试：top-paths 返回 path 聚合 ✓；confessions/top type=wish 返回 wish 类型 Top ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 5 项新功能（热门路径/热榜类型筛选/批量改优先级/标签匹配相关/Footer 装饰）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 5 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- 热门路径目前只有 `/` 一个（track API 只上报首页 path），未来其他页面路径会有更丰富数据
+- 相关事件按标签匹配会发多次 API 请求（同分类 + 每个标签），事件多时略慢（班级站量小无影响）
+- 批量改优先级 batchPriorityMutation 用 Promise.all 并行，事件多时可能打满连接池
+- Footer 装饰光晕在低端设备可能影响渲染性能（blur-3xl 计算量大）
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 站点配置加自定义 CSS 主题色 hex 输入（不只 6 选 1）
+- 事件详情 Modal 加「上一条/下一条」按标签分组（不只时间顺序）
+- 后台批量改发布时间（批量延后/提前发布）
+- 访问统计加「热门 referrer」Top 10（来源分析）
+- 表白墙热榜加「按反应数排序」切换（不只 likes+reactions 总分）
+- PWA service worker 加后台同步（离线发布的表白/留言自动同步）

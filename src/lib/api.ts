@@ -433,14 +433,18 @@ export interface ConfessionTopItem {
 export interface ConfessionTopResponse {
   items: ConfessionTopItem[]
   days: number
+  type?: string
   generatedAt: string
 }
 
 export function getConfessionTop(
   days = 7,
   limit = 10,
+  type?: string,
 ): Promise<ConfessionTopResponse> {
-  return apiGet<ConfessionTopResponse>('/api/confessions/top', { days, limit })
+  const params: Record<string, QueryValue> = { days, limit }
+  if (type) params.type = type
+  return apiGet<ConfessionTopResponse>('/api/confessions/top', params)
 }
 
 export function deleteConfession(id: string): Promise<OkResponse> {
@@ -499,6 +503,22 @@ export interface HourlyStats {
 
 export function getHourlyStats(): Promise<HourlyStats> {
   return apiGet<HourlyStats>('/api/stats/hourly')
+}
+
+// 热门路径 Top N
+export interface TopPathItem {
+  path: string
+  count: number
+}
+export interface TopPathsResponse {
+  items: TopPathItem[]
+  days: number
+  total: number
+  uniquePaths: number
+}
+
+export function getTopPaths(days = 7, limit = 10): Promise<TopPathsResponse> {
+  return apiGet<TopPathsResponse>('/api/stats/top-paths', { days, limit })
 }
 
 // ===== 上报访问 =====

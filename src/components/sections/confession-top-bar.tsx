@@ -41,15 +41,25 @@ const DAYS_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: '全部' },
 ]
 
+const TYPE_OPTIONS: { value: string; label: string; emoji: string }[] = [
+  { value: '', label: '全部', emoji: '🌈' },
+  { value: 'confession', label: '表白', emoji: '💗' },
+  { value: 'thanks', label: '感谢', emoji: '🙏' },
+  { value: 'bless', label: '祝福', emoji: '🌈' },
+  { value: 'complain', label: '吐槽', emoji: '😤' },
+  { value: 'wish', label: '心愿', emoji: '⭐' },
+]
+
 export function ConfessionTopBar() {
   const accessPassed = useAppStore((s) => s.accessPassed)
   const [days, setDays] = React.useState(7)
+  const [type, setType] = React.useState('')
 
   const topQuery = useQuery({
-    queryKey: ['confessions-top', days, 5],
-    queryFn: () => getConfessionTop(days, 5),
+    queryKey: ['confessions-top', days, 5, type],
+    queryFn: () => getConfessionTop(days, 5, type || undefined),
     enabled: accessPassed,
-    staleTime: 5 * 60 * 1000, // 5 分钟缓存
+    staleTime: 5 * 60 * 1000,
   })
 
   const items = topQuery.data?.items ?? []
@@ -66,31 +76,77 @@ export function ConfessionTopBar() {
           <Flame className="size-3.5" />
           {currentLabel}热榜
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="hidden text-xs text-muted-foreground sm:inline">
           按点赞 + 反应热度排序
         </span>
-        {/* 时间维度切换 */}
+        {/* 类型筛选 */}
         <div className="ml-auto flex items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm">
-          {DAYS_OPTIONS.map((opt) => {
-            const active = days === opt.value
+          {TYPE_OPTIONS.map((opt) => {
+            const active = type === opt.value
             return (
               <button
-                key={opt.value}
+                key={opt.value || 'all'}
                 type="button"
-                onClick={() => setDays(opt.value)}
+                onClick={() => setType(opt.value)}
                 aria-pressed={active}
+                title={`${opt.emoji} ${opt.label}`}
                 className={cn(
-                  'rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                  'rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
                   active
                     ? 'bg-amber-500 text-white shadow-sm'
                     : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300',
                 )}
               >
-                {opt.label}
+                <span className="mr-0.5">{opt.emoji}</span>
+                <span className="hidden sm:inline">{opt.label}</span>
               </button>
             )
           })}
         </div>
+      </div>
+
+      {/* 时间维度切换 */}
+      <div className="mb-3 flex items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm sm:hidden">
+        {DAYS_OPTIONS.map((opt) => {
+          const active = days === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setDays(opt.value)}
+              aria-pressed={active}
+              className={cn(
+                'flex-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+                active
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300',
+              )}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+      <div className="mb-3 hidden items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm sm:flex sm:w-auto sm:ml-auto">
+        {DAYS_OPTIONS.map((opt) => {
+          const active = days === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setDays(opt.value)}
+              aria-pressed={active}
+              className={cn(
+                'rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                active
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300',
+              )}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
       </div>
 
       {topQuery.isLoading ? (
@@ -105,7 +161,7 @@ export function ConfessionTopBar() {
       ) : items.length === 0 ? (
         <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <Flame className="size-6 opacity-40" />
-          <p>{currentLabel}还没有表白，快来第一个发布吧</p>
+          <p>{currentLabel}还没有该类型表白，快来第一个发布吧</p>
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">

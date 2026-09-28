@@ -198,11 +198,43 @@ export function EventDetailModal() {
       .then(async (data) => {
         if (cancelled) return
         setEvent(data)
-        // 拉相关事件：同分类，排除自己，最多 3 条
+        // 拉相关事件：按标签匹配优先 + 同分类兜底
         try {
-          const res = await listEvents({ category: data.category, page: 1, pageSize: 4 })
+          const myTags = data.tags
+            ? data.tags.split(',').map((t) => t.trim()).filter(Boolean)
+            : []
+          // 1. 先按每个标签拉候选（去重）
+          const candidates = new Map<string, Event>()
+          // 同分类候选
+          const catRes = await listEvents({ category: data.category, page: 1, pageSize: 10 })
+          for (const e of catRes.items) {
+            if (e.id !== data.id) candidates.set(e.id, e)
+          }
+          // 按每个标签拉候选
+          for (const tag of myTags.slice(0, 3)) {
+            try {
+              const tagRes = await listEvents({ tag, page: 1, pageSize: 5 })
+              for (const e of tagRes.items) {
+                if (e.id !== data.id) candidates.set(e.id, e)
+              }
+            } catch {
+              // 单个标签失败不阻塞
+            }
+          }
+          // 2. 按标签重合度排序
+          const myTagSet = new Set(myTags)
+          const scored = Array.from(candidates.values()).map((e) => {
+            const eTags = e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
+            const overlap = eTags.filter((t) => myTagSet.has(t)).length
+            // 同分类 +1 分
+            const sameCat = e.category === data.category ? 1 : 0
+            // 高浏览 +0.5 分（归一化）
+            const viewScore = Math.min(0.5, e.viewCount / 1000)
+            return { event: e, score: overlap * 2 + sameCat + viewScore }
+          })
+          scored.sort((a, b) => b.score - a.score || b.event.viewCount - a.event.viewCount)
           if (!cancelled) {
-            setRelated(res.items.filter((e) => e.id !== data.id).slice(0, 3))
+            setRelated(scored.slice(0, 3).map((s) => s.event))
           }
         } catch {
           // 相关事件失败不影响主流程
@@ -534,6 +566,9 @@ export function EventDetailModal() {
                       <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
                         <Sparkles className="size-4 text-emerald-600" />
                         相关推荐
+                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                          （按标签匹配）
+                        </span>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-3">
                         {related.map((e) => (
