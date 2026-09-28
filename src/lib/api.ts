@@ -557,6 +557,18 @@ export function getVisitorTypes(days = 7): Promise<VisitorTypesResponse> {
   return apiGet<VisitorTypesResponse>('/api/stats/visitor-types', { days })
 }
 
+// 本周 vs 上周同比
+export interface WeeklyComparisonResponse {
+  thisWeek: { visits: number; messages: number }
+  lastWeek: { visits: number; messages: number }
+  visitChange: number
+  messageChange: number
+}
+
+export function getWeeklyComparison(): Promise<WeeklyComparisonResponse> {
+  return apiGet<WeeklyComparisonResponse>('/api/stats/weekly-comparison')
+}
+
 // ===== 上报访问 =====
 export function trackVisit(payload: TrackPayload): Promise<TrackResponse> {
   return apiPost<TrackResponse>('/api/track', payload)

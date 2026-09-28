@@ -53,6 +53,28 @@ import { EmptyState, CardSkeleton } from '@/components/empty-state'
 const MAX_CONTENT = 500
 
 const LIKED_KEY = (id: string) => `gw94_message_liked_${id}`
+
+// 关键词高亮：把 text 中匹配 query 的部分包成 <mark>
+function highlightText(text: string, query?: string): React.ReactNode {
+  if (!query || !query.trim()) return text
+  const q = query.trim()
+  // 转义正则特殊字符
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`(${escaped})`, 'gi')
+  const parts = text.split(re)
+  return parts.map((part, i) =>
+    re.test(part) && part.toLowerCase() === q.toLowerCase() ? (
+      <mark
+        key={i}
+        className="rounded bg-amber-300/60 px-0.5 text-foreground dark:bg-amber-500/40"
+      >
+        {part}
+      </mark>
+    ) : (
+      <React.Fragment key={i}>{part}</React.Fragment>
+    ),
+  )
+}
 function isLiked(id: string): boolean {
   if (typeof window === 'undefined') return false
   try {
@@ -107,12 +129,14 @@ function ReplyCard({ reply }: { reply: Message }) {
 function MessageCard({
   message,
   isAdmin,
+  search,
   onLike,
   onDelete,
   onReply,
 }: {
   message: Message
   isAdmin: boolean
+  search?: string
   onLike: (id: string) => void
   onDelete: (id: string) => void
   onReply: (parentId: string, content: string) => void
@@ -183,7 +207,7 @@ function MessageCard({
 
       {/* 内容 */}
       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-        {message.content}
+        {highlightText(message.content, search)}
       </p>
 
       {/* 联系方式（管理员可见） */}
@@ -604,6 +628,7 @@ export function MessageSection() {
                   key={m.id}
                   message={m}
                   isAdmin={isAdmin}
+                  search={search}
                   onLike={(id) => likeMut.mutate(id)}
                   onDelete={(id) => deleteMut.mutate(id)}
                   onReply={(parentId, content) => replyMut.mutate({ parentId, content })}

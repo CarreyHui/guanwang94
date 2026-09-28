@@ -28,6 +28,7 @@ import {
   Activity,
   Loader2,
   TrendingUp,
+  TrendingDown,
   BarChart3,
   Smartphone,
   Monitor,
@@ -36,6 +37,9 @@ import {
   UserPlus,
   UserCheck,
   Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,6 +60,7 @@ import {
   getTopPaths,
   getTopReferrers,
   getVisitorTypes,
+  getWeeklyComparison,
 } from '@/lib/api'
 import type { OverviewStats, TrendPoint, TopEvent, Visit } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -92,6 +97,67 @@ function StatCard({ label, value, icon: Icon, tint }: StatCardProps) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ===== 同比对比子组件 =====
+interface ComparisonItemProps {
+  label: string
+  thisWeek: number
+  lastWeek: number
+  change: number // 百分比，正=增长，负=下降
+}
+
+function ComparisonItem({ label, thisWeek, lastWeek, change }: ComparisonItemProps) {
+  const isUp = change > 0
+  const isDown = change < 0
+  const isFlat = change === 0
+  const Icon = isUp ? ArrowUpRight : isDown ? ArrowDownRight : Minus
+  const colorClass = isUp
+    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+    : isDown
+      ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10'
+      : 'text-muted-foreground bg-muted'
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span
+          className={cn(
+            'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+            colorClass,
+          )}
+        >
+          <Icon className="size-3" />
+          {isFlat ? '持平' : `${Math.abs(change)}%`}
+        </span>
+      </div>
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <div className="text-[11px] text-muted-foreground">本周</div>
+          <div className="text-xl font-bold tabular-nums">{formatNumber(thisWeek)}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[11px] text-muted-foreground">上周</div>
+          <div className="text-sm tabular-nums text-muted-foreground">{formatNumber(lastWeek)}</div>
+        </div>
+      </div>
+      {/* 进度条对比 */}
+      <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+        <div
+          className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
+          style={{
+            width: `${(thisWeek / Math.max(thisWeek + lastWeek, 1)) * 100}%`,
+          }}
+        />
+        <div
+          className="h-full bg-muted"
+          style={{
+            width: `${(lastWeek / Math.max(thisWeek + lastWeek, 1)) * 100}%`,
+          }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -207,6 +273,10 @@ export function DashboardTab() {
     queryKey: ['admin', 'visitor-types', 7],
     queryFn: () => getVisitorTypes(7),
   })
+  const weeklyComparisonQuery = useQuery({
+    queryKey: ['admin', 'weekly-comparison'],
+    queryFn: getWeeklyComparison,
+  })
 
   const trendData = trend.data ?? []
   const topData = topEvents.data ?? []
@@ -243,6 +313,40 @@ export function DashboardTab() {
           tint="bg-rose-600/15 text-rose-700 dark:text-rose-300"
         />
       </section>
+
+      {/* 本周 vs 上周同比 */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="size-4 text-emerald-600" />
+            本周 vs 上周同比
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {weeklyComparisonQuery.isLoading ? (
+            <CenterSpinner />
+          ) : weeklyComparisonQuery.isError ? (
+            <EmptyHint hint="加载失败" />
+          ) : !weeklyComparisonQuery.data ? (
+            <EmptyHint hint="暂无数据" />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ComparisonItem
+                label="访问量"
+                thisWeek={weeklyComparisonQuery.data.thisWeek.visits}
+                lastWeek={weeklyComparisonQuery.data.lastWeek.visits}
+                change={weeklyComparisonQuery.data.visitChange}
+              />
+              <ComparisonItem
+                label="留言数"
+                thisWeek={weeklyComparisonQuery.data.thisWeek.messages}
+                lastWeek={weeklyComparisonQuery.data.lastWeek.messages}
+                change={weeklyComparisonQuery.data.messageChange}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 趋势折线图 */}
       <Card className="gap-2 py-4">

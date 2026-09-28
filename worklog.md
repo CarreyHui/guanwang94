@@ -860,3 +860,70 @@ Stage Summary:
 - 访问统计加「热门搜索词」Top 10（如果加了搜索日志）
 - 后台批量操作加「批量删除标签」（除覆盖/追加外的第 3 种标签操作）
 - 表白墙热榜加「按周/月」分组（不只按天聚合）
+
+---
+Task ID: 14
+Agent: webDevReview 定时巡检 agent（第 10 轮）
+Task: QA + 本周 vs 上周同比 + 留言搜索高亮 + 主题色混合模式 + 事件卡片 hover 图标
+
+Work Log:
+- 读 worklog 了解第 9 轮进度（?event= 自动打开/批量改标签/热榜 90 天/最佳发布时段全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（4 项）：
+1. **访问趋势本周 vs 上周同比**：
+   - 新 API `/api/stats/weekly-comparison`：本周（近 7 天）vs 上周（7-14 天前）访问/留言数 + 同比百分比
+   - 前端 api.ts 加 getWeeklyComparison + WeeklyComparisonResponse 类型
+   - dashboard-tab 加「本周 vs 上周同比」Card（4 个数字卡后）：
+     - ComparisonItem 子组件：label + 本周数 + 上周数 + 同比百分比 badge（emerald 增长/rose 下降/muted 持平）
+     - ArrowUpRight/ArrowDownRight/Minus 图标
+     - 双色进度条对比（emerald 本周 + muted 上周）
+   - 测试：dashboard 显示「本周 vs 上周同比」+ 访问量/留言数 本周/上周 ✓
+
+2. **留言搜索关键词高亮**：
+   - message-section 加 highlightText 函数：用正则 split + mark 标签包裹匹配部分
+   - mark 样式：amber-300/60 背景（dark amber-500/40）
+   - MessageCard 加 search prop，内容渲染调 highlightText(message.content, search)
+   - 转义正则特殊字符避免注入
+   - 测试：搜索「月考」→ 留言内容「月考」部分显示为 `<mark>月考</mark>` ✓
+
+3. **主题色预设+自定义混合模式**：
+   - ThemeColorApplier applyThemeColor 重构：
+     - accent 始终用预设（保证对比度）
+     - 有 customHex 时覆盖 primary/ring/chart-1，但仍应用预设 accent
+     - 无 customHex 时全用预设
+   - 让管理员可以「选 emerald 预设 + 自定义 hex 主色」共存
+
+4. **事件卡片封面 hover 中心图标**：
+   - EventCard 封面加中心 hover 图标：白色圆形 + ArrowRight + shadow-lg
+   - hover 时 opacity 0→100 + scale 0.75→1.0 过渡
+   - 配合原有「阅读全文」右下角提示 + 渐变遮罩
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - dashboard「本周 vs 上周同比」Card + 访问量/留言数 本周/上周显示 ✓
+  - 留言搜索「月考」→ `<mark>月考</mark>` 高亮 ✓
+- 后端 API 测试：weekly-comparison 返回 thisWeek.visits=56/lastWeek.visits=0/visitChange=100 ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 4 项新功能（本周 vs 上周同比/留言搜索高亮/主题色混合模式/事件 hover 图标）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 4 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- 本周 vs 上周同比在上周数据为 0 时显示 +100%（逻辑正确但视觉可能误导，已用「持平」处理 0 vs 0）
+- 留言搜索高亮用正则 split，超长 query 可能影响性能（班级站量小无影响）
+- 主题色混合模式下 accent 用预设，可能与自定义 hex 不协调（但保证对比度优先）
+- 事件卡片 hover 中心图标在移动端无 hover（触摸设备看不到，但有「阅读全文」提示）
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- PWA service worker 加后台同步（离线发布的表白/留言自动同步）
+- 事件详情 Modal 加「分享到微信/QQ」原生分享
+- 访问统计加「热门搜索词」Top 10（如果加了搜索日志）
+- 后台批量操作加「批量删除标签」（除覆盖/追加外的第 3 种标签操作）
+- 表白墙热榜加「按周/月」分组（不只按天聚合）
+- 自定义主题色加「调色板生成器」（输入主色自动生成 5 级色阶）

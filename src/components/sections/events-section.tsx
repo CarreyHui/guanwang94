@@ -180,6 +180,12 @@ function EventCard({
         />
         {/* 渐变遮罩（hover 时浮现） */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        {/* 中心 hover 图标 */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-all duration-300 group-hover:opacity-100">
+          <span className="flex size-12 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-lg backdrop-blur-sm transition-transform duration-300 group-hover:scale-100 scale-75">
+            <ArrowRight className="size-5" />
+          </span>
+        </div>
         {/* 置顶标 */}
         {event.pinned > 0 && (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm">

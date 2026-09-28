@@ -43,9 +43,16 @@ const PALETTES: Record<ThemeColorKey, {
 }
 
 function applyThemeColor(color: ThemeColorKey, customHex?: string) {
-  // 如果有自定义 hex，覆盖 primary/ring/chart-1
+  const palette = PALETTES[color] || PALETTES.emerald
+  const isDark = document.documentElement.classList.contains('dark')
+  const variant = isDark ? palette.dark : palette.light
+
+  const root = document.documentElement
+  // accent 始终用预设（保证对比度）
+  root.style.setProperty('--accent', variant.accent)
+
+  // 如果有自定义 hex，覆盖 primary/ring/chart-1（混合模式）
   if (customHex && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(customHex)) {
-    const root = document.documentElement
     root.style.setProperty('--primary', customHex)
     root.style.setProperty('--ring', customHex)
     root.style.setProperty('--chart-1', customHex)
@@ -53,14 +60,10 @@ function applyThemeColor(color: ThemeColorKey, customHex?: string) {
     root.setAttribute('data-custom-color', customHex)
     return
   }
-  const palette = PALETTES[color] || PALETTES.emerald
-  const isDark = document.documentElement.classList.contains('dark')
-  const variant = isDark ? palette.dark : palette.light
 
-  const root = document.documentElement
+  // 无自定义 hex，全用预设
   root.style.setProperty('--primary', variant.primary)
   root.style.setProperty('--ring', variant.ring)
-  root.style.setProperty('--accent', variant.accent)
   root.style.setProperty('--chart-1', variant.chart1)
   root.setAttribute('data-theme-color', color)
   root.removeAttribute('data-custom-color')
