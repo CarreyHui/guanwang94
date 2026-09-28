@@ -107,37 +107,63 @@ export function EventDetailModal() {
   const closeEvent = useEventModal((s) => s.closeEvent)
   const openEvent = useEventModal((s) => s.openEvent)
 
-  // 拉所有事件 id 列表（轻量，只取 id），用于翻页
-  const [eventIds, setEventIds] = React.useState<string[]>([])
+  // 拉所有事件列表（含 tags），用于翻页 + 按标签筛选
+  const [allEvents, setAllEvents] = React.useState<Event[]>([])
+  const [byTag, setByTag] = React.useState(false)
   React.useEffect(() => {
     if (!open) {
-      setEventIds([])
+      setAllEvents([])
+      setByTag(false)
       return
     }
     let cancelled = false
     ;(async () => {
-      const ids: string[] = []
+      const all: Event[] = []
       let page = 1
       const pageSize = 50
-      // 最多拉 5 页（250 条）
       while (page <= 5) {
         try {
           const res = await listEvents({ page, pageSize })
-          ids.push(...res.items.map((e) => e.id))
-          if (ids.length >= res.total || res.items.length < pageSize) break
+          all.push(...res.items)
+          if (all.length >= res.total || res.items.length < pageSize) break
           page++
         } catch {
           break
         }
       }
-      if (!cancelled) setEventIds(ids)
+      if (!cancelled) setAllEvents(all)
     })()
     return () => {
       cancelled = true
     }
   }, [open])
 
-  // 当前事件在列表中的索引
+  const [event, setEvent] = React.useState<Event | null>(null)
+  const [loading, setLoading] = React.useState(false)
+  const [lightboxOpen, setLightboxOpen] = React.useState(false)
+  const [related, setRelated] = React.useState<Event[]>([])
+  const [scrollPct, setScrollPct] = React.useState(0)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+
+  // 当前事件的 tags（用于 byTag 筛选）
+  const currentTags = React.useMemo(() => {
+    if (!event) return [] as string[]
+    return event.tags
+      ? event.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      : []
+  }, [event])
+
+  // 翻页列表（byTag 时只取与当前事件有共同标签的事件）
+  const navList = React.useMemo(() => {
+    if (!byTag || currentTags.length === 0) return allEvents
+    const tagSet = new Set(currentTags)
+    return allEvents.filter((e) => {
+      const eTags = e.tags ? e.tags.split(',').map((t) => t.trim()).filter(Boolean) : []
+      return eTags.some((t) => tagSet.has(t))
+    })
+  }, [allEvents, byTag, currentTags])
+
+  const eventIds = navList.map((e) => e.id)
   const currentIndex = selectedId ? eventIds.indexOf(selectedId) : -1
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex >= 0 && currentIndex < eventIds.length - 1
@@ -165,13 +191,6 @@ export function EventDetailModal() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, hasPrev, hasNext, currentIndex, eventIds])
-
-  const [event, setEvent] = React.useState<Event | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [lightboxOpen, setLightboxOpen] = React.useState(false)
-  const [related, setRelated] = React.useState<Event[]>([])
-  const [scrollPct, setScrollPct] = React.useState(0)
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
 
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget
@@ -646,7 +665,25 @@ export function EventDetailModal() {
                     </Button>
                     {/* 翻页按钮 */}
                     {eventIds.length > 1 && (
-                      <div className="ml-auto flex items-center gap-1.5">
+                      <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                        {/* 按标签翻页 toggle */}
+                        {currentTags.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setByTag((v) => !v)}
+                            aria-pressed={byTag}
+                            title={byTag ? '当前：仅在有共同标签的事件间翻页' : '开启：仅在有共同标签的事件间翻页'}
+                            className={cn(
+                              'inline-flex h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors',
+                              byTag
+                                ? 'border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300'
+                                : 'border-border text-muted-foreground hover:bg-accent',
+                            )}
+                          >
+                            <Tag className="size-3.5" />
+                            <span className="hidden sm:inline">按标签</span>
+                          </button>
+                        )}
                         <Button
                           type="button"
                           size="sm"
@@ -657,7 +694,7 @@ export function EventDetailModal() {
                           aria-label="上一条事件"
                         >
                           <ChevronLeft className="size-4" />
-                          上一条
+                          <span className="hidden sm:inline">上一条</span>
                         </Button>
                         <span className="text-xs tabular-nums text-muted-foreground">
                           {currentIndex >= 0 ? currentIndex + 1 : '-'}/{eventIds.length}
@@ -671,7 +708,7 @@ export function EventDetailModal() {
                           className="h-9 gap-1.5"
                           aria-label="下一条事件"
                         >
-                          下一条
+                          <span className="hidden sm:inline">下一条</span>
                           <ChevronRight className="size-4" />
                         </Button>
                       </div>

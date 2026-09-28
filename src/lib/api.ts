@@ -231,6 +231,7 @@ export interface SiteConfigResponse {
   logoUrl: string
   ogImageUrl: string
   themeColor: string
+  customPrimaryColor: string
 }
 
 export interface SiteConfigUpdateInput {
@@ -239,6 +240,7 @@ export interface SiteConfigUpdateInput {
   logoUrl?: string
   ogImageUrl?: string
   themeColor?: string
+  customPrimaryColor?: string
 }
 
 export function getSiteConfig(): Promise<SiteConfigResponse> {
@@ -434,6 +436,7 @@ export interface ConfessionTopResponse {
   items: ConfessionTopItem[]
   days: number
   type?: string
+  sort?: string
   generatedAt: string
 }
 
@@ -441,9 +444,11 @@ export function getConfessionTop(
   days = 7,
   limit = 10,
   type?: string,
+  sort?: 'score' | 'likes' | 'reactions',
 ): Promise<ConfessionTopResponse> {
   const params: Record<string, QueryValue> = { days, limit }
   if (type) params.type = type
+  if (sort) params.sort = sort
   return apiGet<ConfessionTopResponse>('/api/confessions/top', params)
 }
 
@@ -519,6 +524,22 @@ export interface TopPathsResponse {
 
 export function getTopPaths(days = 7, limit = 10): Promise<TopPathsResponse> {
   return apiGet<TopPathsResponse>('/api/stats/top-paths', { days, limit })
+}
+
+// 热门 referrer Top N
+export interface TopReferrerItem {
+  referrer: string
+  count: number
+}
+export interface TopReferrersResponse {
+  items: TopReferrerItem[]
+  days: number
+  total: number
+  uniqueReferrers: number
+}
+
+export function getTopReferrers(days = 7, limit = 10): Promise<TopReferrersResponse> {
+  return apiGet<TopReferrersResponse>('/api/stats/top-referrers', { days, limit })
 }
 
 // ===== 上报访问 =====

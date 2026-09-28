@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server'
 import { checkAccess, json } from '@/lib/auth'
 import { db } from '@/lib/db'
 
-// GET /api/confessions/top?days=7&limit=10&type=confession
-// 返回近 N 天按 likes + reactions 总数排序的 Top N 表白墙
+// GET /api/confessions/top?days=7&limit=10&type=confession&sort=score
+// 返回近 N 天按指定维度排序的 Top N 表白墙
 // days=0 表示全部历史；type 为空表示所有类型
+// sort: score=likes+reactions 总分（默认），likes=仅点赞数，reactions=仅反应数
 export async function GET(req: NextRequest) {
   try {
     const access = await checkAccess(req)
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest) {
     const type = url.searchParams.get('type') || ''
     const ALLOWED_TYPES = ['confession', 'thanks', 'bless', 'complain', 'wish']
     const typeFilter = ALLOWED_TYPES.includes(type) ? type : ''
+    const sortRaw = url.searchParams.get('sort') || 'score'
+    const sort = ['score', 'likes', 'reactions'].includes(sortRaw) ? sortRaw : 'score'
 
     // 计算截止时间（days=0 时不限制）
     const since = days > 0 ? new Date(Date.now() - days * 24 * 60 * 60 * 1000) : undefined
@@ -46,12 +49,23 @@ export async function GET(req: NextRequest) {
       return { ...rest, reactionCount, score }
     })
 
-    scored.sort((a, b) => b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime())
+    // 按指定维度排序
+    scored.sort((a, b) => {
+      if (sort === 'likes') {
+        return b.likes - a.likes || b.createdAt.getTime() - a.createdAt.getTime()
+      }
+      if (sort === 'reactions') {
+        return b.reactionCount - a.reactionCount || b.createdAt.getTime() - a.createdAt.getTime()
+      }
+      // score
+      return b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime()
+    })
 
     return json({
       items: scored.slice(0, limit),
       days,
       type: typeFilter,
+      sort,
       generatedAt: new Date().toISOString(),
     })
   } catch (e: any) {

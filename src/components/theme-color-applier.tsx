@@ -42,7 +42,17 @@ const PALETTES: Record<ThemeColorKey, {
   },
 }
 
-function applyThemeColor(color: ThemeColorKey) {
+function applyThemeColor(color: ThemeColorKey, customHex?: string) {
+  // 如果有自定义 hex，覆盖 primary/ring/chart-1
+  if (customHex && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(customHex)) {
+    const root = document.documentElement
+    root.style.setProperty('--primary', customHex)
+    root.style.setProperty('--ring', customHex)
+    root.style.setProperty('--chart-1', customHex)
+    root.setAttribute('data-theme-color', 'custom')
+    root.setAttribute('data-custom-color', customHex)
+    return
+  }
   const palette = PALETTES[color] || PALETTES.emerald
   const isDark = document.documentElement.classList.contains('dark')
   const variant = isDark ? palette.dark : palette.light
@@ -52,16 +62,17 @@ function applyThemeColor(color: ThemeColorKey) {
   root.style.setProperty('--ring', variant.ring)
   root.style.setProperty('--accent', variant.accent)
   root.style.setProperty('--chart-1', variant.chart1)
-  // 同时设置一个 data 属性，方便 CSS 选择器
   root.setAttribute('data-theme-color', color)
+  root.removeAttribute('data-custom-color')
 }
 
 export function ThemeColorApplier() {
   useEffect(() => {
     // 1. 先用 localStorage 缓存应用，避免闪烁
     const cached = localStorage.getItem(STORAGE_KEY) as ThemeColorKey | null
+    const cachedCustom = localStorage.getItem('gw94_custom_color') || ''
     if (cached && cached in PALETTES) {
-      applyThemeColor(cached)
+      applyThemeColor(cached, cachedCustom || undefined)
     }
 
     // 2. 拉取最新主题色
@@ -74,9 +85,15 @@ export function ThemeColorApplier() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const color = data?.themeColor as ThemeColorKey | undefined
+        const custom = (data?.customPrimaryColor as string | undefined) || ''
         if (color && color in PALETTES) {
-          applyThemeColor(color)
+          applyThemeColor(color, custom || undefined)
           localStorage.setItem(STORAGE_KEY, color)
+          if (custom) {
+            localStorage.setItem('gw94_custom_color', custom)
+          } else {
+            localStorage.removeItem('gw94_custom_color')
+          }
         }
       })
       .catch(() => {
@@ -86,8 +103,9 @@ export function ThemeColorApplier() {
     // 3. 监听主题切换（dark/light）时重新应用（因为 dark 调色板不同）
     const observer = new MutationObserver(() => {
       const cur = localStorage.getItem(STORAGE_KEY) as ThemeColorKey | null
+      const custom = localStorage.getItem('gw94_custom_color') || ''
       if (cur && cur in PALETTES) {
-        applyThemeColor(cur)
+        applyThemeColor(cur, custom || undefined)
       }
     })
     observer.observe(document.documentElement, {

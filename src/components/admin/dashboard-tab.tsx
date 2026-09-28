@@ -51,6 +51,7 @@ import {
   getRecentVisits,
   getHourlyStats,
   getTopPaths,
+  getTopReferrers,
 } from '@/lib/api'
 import type { OverviewStats, TrendPoint, TopEvent, Visit } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -193,6 +194,10 @@ export function DashboardTab() {
   const topPathsQuery = useQuery({
     queryKey: ['admin', 'top-paths', 7, 10],
     queryFn: () => getTopPaths(7, 10),
+  })
+  const topReferrersQuery = useQuery({
+    queryKey: ['admin', 'top-referrers', 7, 10],
+    queryFn: () => getTopReferrers(7, 10),
   })
 
   const trendData = trend.data ?? []
@@ -628,6 +633,60 @@ export function DashboardTab() {
               {topPathsQuery.data && (
                 <p className="mt-2 border-t pt-2 text-[11px] text-muted-foreground">
                   共 {topPathsQuery.data.uniquePaths} 个不同路径，{topPathsQuery.data.total} 次访问
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 热门来源 referrer Top 10 */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Globe className="size-4 text-emerald-600" />
+            热门来源 Top 10（近 7 天）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topReferrersQuery.isLoading ? (
+            <CenterSpinner />
+          ) : topReferrersQuery.isError ? (
+            <EmptyHint hint="加载失败" />
+          ) : (topReferrersQuery.data?.items ?? []).length === 0 ? (
+            <EmptyHint hint="暂无来源数据（直接访问无 referrer）" />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {(topReferrersQuery.data?.items ?? []).map((item, i) => {
+                const max = topReferrersQuery.data?.items[0]?.count || 1
+                const pct = (item.count / max) * 100
+                return (
+                  <div key={item.referrer + i} className="flex items-center gap-2">
+                    <span className="w-6 shrink-0 text-right text-xs font-medium text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1">
+                      <div className="mb-0.5 flex items-center justify-between gap-2">
+                        <code className="truncate font-mono text-xs text-foreground">
+                          {item.referrer}
+                        </code>
+                        <span className="shrink-0 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                          {item.count}
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-400 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {topReferrersQuery.data && (
+                <p className="mt-2 border-t pt-2 text-[11px] text-muted-foreground">
+                  共 {topReferrersQuery.data.uniqueReferrers} 个来源，{topReferrersQuery.data.total} 次带 referrer 访问
                 </p>
               )}
             </div>

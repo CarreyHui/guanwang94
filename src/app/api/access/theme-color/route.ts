@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
     if (!access.ok) return json({ error: access.message }, access.status)
 
     const config = await db.siteConfig.findUnique({ where: { id: 'default' } })
-    return json({ themeColor: config?.themeColor || 'emerald' })
+    return json({
+      themeColor: config?.themeColor || 'emerald',
+      customPrimaryColor: config?.customPrimaryColor || '',
+    })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)
   }

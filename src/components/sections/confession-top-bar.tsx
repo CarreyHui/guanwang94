@@ -50,14 +50,21 @@ const TYPE_OPTIONS: { value: string; label: string; emoji: string }[] = [
   { value: 'wish', label: '心愿', emoji: '⭐' },
 ]
 
+const SORT_OPTIONS: { value: 'score' | 'likes' | 'reactions'; label: string; icon: typeof Flame }[] = [
+  { value: 'score', label: '热度', icon: Flame },
+  { value: 'likes', label: '点赞', icon: Crown },
+  { value: 'reactions', label: '反应', icon: Award },
+]
+
 export function ConfessionTopBar() {
   const accessPassed = useAppStore((s) => s.accessPassed)
   const [days, setDays] = React.useState(7)
   const [type, setType] = React.useState('')
+  const [sort, setSort] = React.useState<'score' | 'likes' | 'reactions'>('score')
 
   const topQuery = useQuery({
-    queryKey: ['confessions-top', days, 5, type],
-    queryFn: () => getConfessionTop(days, 5, type || undefined),
+    queryKey: ['confessions-top', days, 5, type, sort],
+    queryFn: () => getConfessionTop(days, 5, type || undefined, sort),
     enabled: accessPassed,
     staleTime: 5 * 60 * 1000,
   })
@@ -76,9 +83,31 @@ export function ConfessionTopBar() {
           <Flame className="size-3.5" />
           {currentLabel}热榜
         </span>
-        <span className="hidden text-xs text-muted-foreground sm:inline">
-          按点赞 + 反应热度排序
-        </span>
+        {/* 排序切换 */}
+        <div className="flex items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm">
+          {SORT_OPTIONS.map((opt) => {
+            const active = sort === opt.value
+            const Icon = opt.icon
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setSort(opt.value)}
+                aria-pressed={active}
+                title={`按${opt.label}排序`}
+                className={cn(
+                  'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+                  active
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300',
+                )}
+              >
+                <Icon className="size-3" />
+                <span className="hidden sm:inline">{opt.label}</span>
+              </button>
+            )
+          })}
+        </div>
         {/* 类型筛选 */}
         <div className="ml-auto flex items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm">
           {TYPE_OPTIONS.map((opt) => {

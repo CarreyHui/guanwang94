@@ -644,3 +644,79 @@ Stage Summary:
 - 访问统计加「热门 referrer」Top 10（来源分析）
 - 表白墙热榜加「按反应数排序」切换（不只 likes+reactions 总分）
 - PWA service worker 加后台同步（离线发布的表白/留言自动同步）
+
+---
+Task ID: 11
+Agent: webDevReview 定时巡检 agent（第 7 轮）
+Task: QA + 热门 referrer + 自定义 hex 主题色 + 热榜排序切换 + 事件按标签翻页
+
+Work Log:
+- 读 worklog 了解第 6 轮进度（热门路径/热榜类型筛选/批量改优先级/标签匹配相关/Footer 装饰全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（4 项）：
+1. **访问统计热门 referrer Top 10**：
+   - 新 API `/api/stats/top-referrers`：拉近 7 天带 referrer 的 visit，提取 host 聚合排序
+   - 修了 Prisma `not: null, not: ''` 冲突（用 AND 数组）
+   - 前端 api.ts 加 getTopReferrers + 类型
+   - dashboard-tab 加「热门来源 Top 10（近 7 天）」Card：amber→rose 渐变进度条 + 共 N 个来源 M 次访问统计
+   - 测试：dashboard 显示「共 1 个来源，2 次带 referrer 访问」✓
+
+2. **自定义 hex 主题色（覆盖预设）**：
+   - Prisma SiteConfig 加 customPrimaryColor 字段（可选 String?）
+   - site-config GET/PUT 加 customPrimaryColor（白名单校验：合法 hex #rgb 或 #rrggbb 或空清除）
+   - theme-color API 也返回 customPrimaryColor
+   - api.ts SiteConfigResponse/SiteConfigUpdateInput 加 customPrimaryColor
+   - ThemeColorApplier applyThemeColor 加 customHex 参数：有 custom 时直接覆盖 primary/ring/chart-1（不走预设调色板），data-theme-color='custom'
+   - localStorage 同步 gw94_custom_color
+   - token-settings-tab 加自定义主色输入区：
+     - 原生 color picker（type="color"）+ hex Input（实时校验 #hex 格式）+ 清除按钮
+     - 保存后写 localStorage 让 ThemeColorApplier 立即生效
+   - 测试：site-config PUT customPrimaryColor=#10b981 成功 ✓，后台显示输入框值 ✓
+
+3. **表白墙热榜排序切换（热度/点赞/反应数）**：
+   - 后端 `/api/confessions/top` 加 sort 参数（score/likes/reactions，默认 score）
+   - api.ts getConfessionTop 加 sort 参数 + ConfessionTopResponse 加 sort 字段
+   - ConfessionTopBar 加 SORT_OPTIONS（3 个：热度 Flame/点赞 Crown/反应 Award）：
+     - 排序切换放标题旁（icon + 标签，移动端只显示 icon）
+     - 选中态 amber 背景
+   - 测试：3 排序按钮「热度/点赞/反应」显示 ✓
+
+4. **事件详情按标签翻页**：
+   - event-detail-modal 拉取逻辑改为存 allEvents: Event[]（含 tags，不只 id）
+   - 加 byTag state + currentTags useMemo（从当前 event 解析 tags）
+   - navList useMemo：byTag 时过滤出与当前事件有共同标签的事件
+   - 翻页按钮区加「按标签」toggle（Tag 图标，emerald 选中态，仅有 tags 时显示）
+   - 索引显示 N/M 动态变化（byTag 时 M 是过滤后总数）
+   - 测试：事件详情显示「按标签」toggle + 翻页按钮 ✓
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 表白墙热榜 3 排序按钮「热度/点赞/反应」显示 ✓
+  - dashboard 热门来源 Top 10 显示「共 1 个来源，2 次带 referrer 访问」✓
+  - 后台站点配置自定义主色输入框（值 #10b981）+ 清除按钮显示 ✓
+  - 事件详情「按标签」toggle + 翻页按钮显示 ✓
+- 后端 API 测试：top-referrers 返回 host 聚合 ✓；confessions/top sort=likes 返回 likes 排序 ✓；site-config PUT customPrimaryColor 成功 ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 4 项新功能（热门 referrer/自定义 hex 主题色/热榜排序切换/事件按标签翻页）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 4 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- 自定义 hex 主题色目前只覆盖 primary/ring/chart-1，accent 仍用预设（避免对比度问题）
+- 热门 referrer 只显示 host（不显示完整 URL），保护隐私但损失细节
+- 事件按标签翻页在 allEvents 加载完成前禁用（loading 态按钮 disabled）
+- 自定义颜色 input 的 hex 校验在前端，后端也有正则白名单兜底
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 后台批量改发布时间（批量延后/提前发布）
+- 表白墙热榜加「按周/月」切换（不只 7/30/全部，加自定义日期范围）
+- 事件详情 Modal 加「分享到微信/QQ」原生分享
+- 访问统计加「新访客 vs 回访」比例（基于 ipHash）
+- PWA service worker 加后台同步（离线发布的表白/留言自动同步）
+- 自定义主题色加「预设调色板 + 自定义 hex」混合模式（不只二选一）

@@ -99,6 +99,7 @@ export function TokenSettingsTab() {
   const [logoUrl, setLogoUrl] = React.useState('')
   const [ogImageUrl, setOgImageUrl] = React.useState('')
   const [themeColor, setThemeColor] = React.useState('emerald')
+  const [customPrimaryColor, setCustomPrimaryColor] = React.useState('')
 
   // 数据加载后填充
   React.useEffect(() => {
@@ -108,6 +109,7 @@ export function TokenSettingsTab() {
       setLogoUrl(siteQuery.data.logoUrl)
       setOgImageUrl(siteQuery.data.ogImageUrl)
       setThemeColor(siteQuery.data.themeColor || 'emerald')
+      setCustomPrimaryColor(siteQuery.data.customPrimaryColor || '')
     }
   }, [siteQuery.data])
 
@@ -119,6 +121,7 @@ export function TokenSettingsTab() {
         logoUrl,
         ogImageUrl,
         themeColor,
+        customPrimaryColor,
       }),
     onSuccess: () => {
       toast.success('站点配置已保存')
@@ -126,6 +129,11 @@ export function TokenSettingsTab() {
       // 同步到 localStorage 让 ThemeColorApplier 立即生效
       if (typeof window !== 'undefined') {
         localStorage.setItem('gw94_theme_color', themeColor)
+        if (customPrimaryColor) {
+          localStorage.setItem('gw94_custom_color', customPrimaryColor)
+        } else {
+          localStorage.removeItem('gw94_custom_color')
+        }
       }
     },
     onError: (err: unknown) => {
@@ -400,6 +408,53 @@ export function TokenSettingsTab() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   保存后全站主色调立即生效（emerald 默认，6 种可选）。访客端下次访问时自动应用。
+                </p>
+              </div>
+
+              {/* 自定义 hex 主题色（覆盖预设） */}
+              <div className="space-y-1.5">
+                <Label htmlFor="custom-color" className="flex items-center gap-1">
+                  <Palette className="size-3.5" />
+                  自定义主色（可选，覆盖预设）
+                </Label>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={customPrimaryColor || '#10b981'}
+                      onChange={(e) => setCustomPrimaryColor(e.target.value)}
+                      className="size-11 cursor-pointer rounded-md border border-input bg-background p-1"
+                      aria-label="选择自定义颜色"
+                    />
+                  </div>
+                  <Input
+                    id="custom-color"
+                    value={customPrimaryColor}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      // 仅允许合法 hex 或空
+                      if (v === '' || /^#[0-9a-fA-F]{0,6}$/.test(v)) {
+                        setCustomPrimaryColor(v)
+                      }
+                    }}
+                    placeholder="#10b981（留空用预设）"
+                    className="h-11 flex-1 font-mono"
+                    maxLength={7}
+                  />
+                  {customPrimaryColor && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCustomPrimaryColor('')}
+                      className="h-11 shrink-0"
+                    >
+                      清除
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  填写合法 hex 颜色（如 <code className="font-mono">#10b981</code>）会覆盖上方预设主色调。留空则使用预设。
                 </p>
               </div>
 

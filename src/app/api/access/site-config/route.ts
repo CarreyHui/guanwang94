@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       logoUrl: config?.logoUrl || '',
       ogImageUrl: config?.ogImageUrl || '',
       themeColor: config?.themeColor || 'emerald',
+      customPrimaryColor: config?.customPrimaryColor || '',
     })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)
@@ -33,7 +34,7 @@ export async function PUT(req: NextRequest) {
       return json({ error: admin.message }, admin.status)
     }
     const body = await req.json().catch(() => ({}))
-    const { siteTitle, siteDescription, logoUrl, ogImageUrl, themeColor } = body || {}
+    const { siteTitle, siteDescription, logoUrl, ogImageUrl, themeColor, customPrimaryColor } = body || {}
 
     const data: Record<string, string | null> = {}
     if (typeof siteTitle === 'string' && siteTitle.trim()) {
@@ -52,6 +53,15 @@ export async function PUT(req: NextRequest) {
     if (typeof themeColor === 'string' && ALLOWED_THEME_COLORS.includes(themeColor)) {
       data.themeColor = themeColor
     }
+    // customPrimaryColor: 合法 hex 颜色（#rgb 或 #rrggbb）或空字符串清除
+    if (typeof customPrimaryColor === 'string') {
+      const trimmed = customPrimaryColor.trim()
+      if (/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed)) {
+        data.customPrimaryColor = trimmed
+      } else if (trimmed === '') {
+        data.customPrimaryColor = null
+      }
+    }
 
     const updated = await db.siteConfig.upsert({
       where: { id: 'default' },
@@ -69,6 +79,7 @@ export async function PUT(req: NextRequest) {
       logoUrl: updated.logoUrl,
       ogImageUrl: updated.ogImageUrl,
       themeColor: updated.themeColor,
+      customPrimaryColor: updated.customPrimaryColor,
     })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)
