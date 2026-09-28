@@ -5,7 +5,6 @@ import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { Hero } from '@/components/hero'
 import { AccessGate } from '@/components/access-gate'
-import { AdminLoginModal } from '@/components/admin-login-modal'
 import { ReadingProgress } from '@/components/reading-progress'
 import { AdminPanel } from '@/components/admin-panel'
 import {
@@ -87,7 +86,6 @@ export default function Home() {
 
       {/* 全局弹层 */}
       <AccessGate />
-      <AdminLoginModal />
       <EventDetailModal />
       {isAdmin && <AdminPanel />}
     </div>

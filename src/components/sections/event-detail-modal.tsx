@@ -1,12 +1,13 @@
 // 九四班官网 - 事件详情 Modal
 // 用 shadcn Dialog；从 useEventModal 全局 store 读 open + selectedId
-// 显示封面（点击放大 Lightbox） + 标题 + 分类/优先级 Badge + 时间/浏览数 + tags + Markdown 正文 + 分享/打印
+// 显示封面（点击放大 Lightbox） + 标题 + 分类/优先级 Badge + 时间/浏览数/阅读时间 + tags + TOC 目录 + Markdown 正文（GFM） + 相关事件 + 分享/打印
 // 数据调 /api/events/[id]，后端会 viewCount +1
 
 'use client'
 
 import * as React from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Eye,
   Clock,
@@ -17,6 +18,9 @@ import {
   Pin,
   GraduationCap,
   Loader2,
+  BookOpen,
+  ListTree,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -31,9 +35,16 @@ import { Button } from '@/components/ui/button'
 import { LazyImage } from '@/components/lazy-image'
 import { Lightbox } from '@/components/lightbox'
 import { useEventModal } from '@/store/use-event-modal'
-import { getEvent } from '@/lib/api'
+import { getEvent, listEvents } from '@/lib/api'
 import type { Event } from '@/lib/types'
-import { formatDateTime, relativeTime, formatNumber } from '@/lib/format'
+import {
+  formatDateTime,
+  relativeTime,
+  formatNumber,
+  readingTime,
+  extractToc,
+  type TocItem,
+} from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 // 分类 → emerald 系颜色映射（与 events-section 保持一致）
@@ -55,27 +66,72 @@ function parseTags(tags: string): string[] {
     .filter(Boolean)
 }
 
+// 自定义 markdown 渲染器：给 h2/h3 加 id 以便 TOC 跳转
+function MarkdownComponents({ toc }: { toc: TocItem[] }) {
+  let tocIdx = 0
+  return {
+    h1: ({ children }: { children?: React.ReactNode }) => {
+      const item = toc[tocIdx++]
+      return (
+        <h1 id={item?.id} className="scroll-mt-4">
+          {children}
+        </h1>
+      )
+    },
+    h2: ({ children }: { children?: React.ReactNode }) => {
+      const item = toc[tocIdx++]
+      return (
+        <h2 id={item?.id} className="scroll-mt-4">
+          {children}
+        </h2>
+      )
+    },
+    h3: ({ children }: { children?: React.ReactNode }) => {
+      const item = toc[tocIdx++]
+      return (
+        <h3 id={item?.id} className="scroll-mt-4">
+          {children}
+        </h3>
+      )
+    },
+  }
+}
+
 export function EventDetailModal() {
   const open = useEventModal((s) => s.open)
   const selectedId = useEventModal((s) => s.selectedId)
   const closeEvent = useEventModal((s) => s.closeEvent)
+  const openEvent = useEventModal((s) => s.openEvent)
 
   const [event, setEvent] = React.useState<Event | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
+  const [related, setRelated] = React.useState<Event[]>([])
 
   // 打开时拉取详情
   React.useEffect(() => {
     if (!open || !selectedId) {
       setEvent(null)
+      setRelated([])
       return
     }
     let cancelled = false
     setLoading(true)
     setEvent(null)
+    setRelated([])
     getEvent(selectedId)
-      .then((data) => {
-        if (!cancelled) setEvent(data)
+      .then(async (data) => {
+        if (cancelled) return
+        setEvent(data)
+        // 拉相关事件：同分类，排除自己，最多 3 条
+        try {
+          const res = await listEvents({ category: data.category, page: 1, pageSize: 4 })
+          if (!cancelled) {
+            setRelated(res.items.filter((e) => e.id !== data.id).slice(0, 3))
+          }
+        } catch {
+          // 相关事件失败不影响主流程
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -127,10 +183,20 @@ export function EventDetailModal() {
   }
 
   const tags = event ? parseTags(event.tags) : []
+  const toc = event ? extractToc(event.content) : []
+  const readTime = event ? readingTime(event.content) : ''
   const [canShare, setCanShare] = React.useState(false)
   React.useEffect(() => {
     setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function')
   }, [])
+
+  // 滚动到指定 TOC anchor
+  function scrollToHeading(id: string) {
+    const el = document.getElementById(id)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   return (
     <>
@@ -206,7 +272,7 @@ export function EventDetailModal() {
                     {event.title}
                   </h2>
 
-                  {/* 元信息 */}
+                  {/* 元信息（新增阅读时间） */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <Clock className="size-3.5" />
@@ -215,6 +281,10 @@ export function EventDetailModal() {
                     <span className="inline-flex items-center gap-1">
                       <Eye className="size-3.5" />
                       {formatNumber(event.viewCount)} 次浏览
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <BookOpen className="size-3.5" />
+                      {readTime}
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <GraduationCap className="size-3.5" />
@@ -249,10 +319,81 @@ export function EventDetailModal() {
                     </div>
                   )}
 
-                  {/* 正文（Markdown） */}
+                  {/* TOC 目录（仅当标题 ≥ 2 个时显示） */}
+                  {toc.length >= 2 && (
+                    <div className="rounded-lg border border-emerald-600/20 bg-emerald-600/5 px-4 py-3">
+                      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                        <ListTree className="size-3.5" />
+                        本文目录
+                      </div>
+                      <ul className="flex flex-col gap-0.5 text-sm">
+                        {toc.map((item, i) => (
+                          <li key={i}>
+                            <button
+                              type="button"
+                              onClick={() => scrollToHeading(item.id)}
+                              className={cn(
+                                'w-full text-left text-muted-foreground transition-colors hover:text-emerald-700 dark:hover:text-emerald-300',
+                                item.level === 1 && 'font-medium',
+                                item.level === 2 && 'pl-3',
+                                item.level === 3 && 'pl-6 text-xs',
+                              )}
+                            >
+                              {item.text}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 正文（Markdown + GFM） */}
                   {event.content && (
                     <div className="prose-94 mt-1 border-t pt-4 text-sm">
-                      <ReactMarkdown>{event.content}</ReactMarkdown>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={MarkdownComponents({ toc })}
+                      >
+                        {event.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+
+                  {/* 相关事件 */}
+                  {related.length > 0 && (
+                    <div className="mt-2 border-t pt-4">
+                      <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+                        <Sparkles className="size-4 text-emerald-600" />
+                        相关推荐
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {related.map((e) => (
+                          <button
+                            key={e.id}
+                            type="button"
+                            onClick={() => openEvent(e.id)}
+                            className="group flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2.5 text-left transition-all hover:border-emerald-600/40 hover:shadow-sm"
+                          >
+                            {e.coverImage && (
+                              <div className="aspect-[16/9] w-full overflow-hidden rounded">
+                                <LazyImage
+                                  src={e.coverImage}
+                                  alt={e.title}
+                                  aspectRatio="wide"
+                                  className="size-full"
+                                  imgClassName="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                              </div>
+                            )}
+                            <span className="line-clamp-2 text-xs font-medium leading-snug">
+                              {e.title}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatNumber(e.viewCount)} 次浏览
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 

@@ -16,6 +16,7 @@ import {
   Sparkles,
   Tag as TagIcon,
   X,
+  ArrowRight,
 } from 'lucide-react'
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,6 +30,7 @@ import { listEvents, listEventTags } from '@/lib/api'
 import type { Event, EventCategory } from '@/lib/types'
 import { formatDate, formatNumber, relativeTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { EmptyState, EventCardSkeleton } from '@/components/empty-state'
 
 // 分类标签
 const CATEGORIES: EventCategory[] = [
@@ -139,12 +141,20 @@ function EventCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.4) }}
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
       className={cn(
-        'group flex flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm',
-        'transition-all hover:-translate-y-0.5 hover:shadow-md',
+        'group relative flex flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm',
+        'transition-[box-shadow,border-color] duration-300',
+        'hover:border-emerald-600/40 hover:shadow-lg hover:shadow-emerald-600/10',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
       )}
     >
+      {/* hover 时左上角光晕 */}
+      <span
+        className="pointer-events-none absolute -left-12 -top-12 size-24 rounded-full bg-emerald-500/20 blur-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        aria-hidden="true"
+      />
       {/* 封面 */}
       <div className="relative overflow-hidden">
         <LazyImage
@@ -152,9 +162,11 @@ function EventCard({
           alt={event.title}
           aspectRatio="wide"
           className="size-full"
-          imgClassName="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+          imgClassName="size-full object-cover transition-transform duration-700 group-hover:scale-110"
           fallbackSrc={`https://picsum.photos/seed/gw94ev${event.id.slice(-6)}/640/360`}
         />
+        {/* 渐变遮罩（hover 时浮现） */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         {/* 置顶标 */}
         {event.pinned > 0 && (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm">
@@ -162,6 +174,11 @@ function EventCard({
             置顶
           </span>
         )}
+        {/* hover 时右下角阅读提示 */}
+        <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-0.5 text-[11px] font-medium text-emerald-700 opacity-0 backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 translate-y-2">
+          阅读全文
+          <ArrowRight className="size-3" />
+        </span>
       </div>
 
       {/* 内容 */}
@@ -419,38 +436,45 @@ export function EventsSection() {
 
       {/* 卡片瀑布流 */}
       {cardsQuery.isLoading ? (
-        <div className="flex h-64 items-center justify-center text-muted-foreground">
-          <Loader2 className="size-6 animate-spin" />
-          <span className="ml-2 text-sm">加载中…</span>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <EventCardSkeleton key={i} />
+          ))}
         </div>
       ) : cardsQuery.isError ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">加载失败</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => cardsQuery.refetch()}
-            className="h-9"
-          >
-            重试
-          </Button>
-        </div>
-      ) : cards.length === 0 ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">
-            {isFiltered ? '没有符合条件的事件' : '暂无事件'}
-          </p>
-          {isFiltered && (
+        <EmptyState
+          icon="search"
+          title="加载失败"
+          description="网络或服务出了点小问题，请稀后重试"
+          action={
             <Button
               variant="outline"
               size="sm"
-              onClick={handleClearFilters}
-              className="h-9"
+              onClick={() => cardsQuery.refetch()}
+              className="h-9 gap-1.5"
             >
-              清空筛选
+              <Loader2 className="size-4" /> 重试
             </Button>
-          )}
-        </div>
+          }
+        />
+      ) : cards.length === 0 ? (
+        <EmptyState
+          icon="inbox"
+          title={isFiltered ? '没有符合条件的事件' : '暂无事件'}
+          description={isFiltered ? '换个关键词或分类试试' : '管理员还没发布事件，敬请期待'}
+          action={
+            isFiltered ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-9"
+              >
+                清空筛选
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

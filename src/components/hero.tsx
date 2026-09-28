@@ -74,6 +74,24 @@ export function Hero() {
   const statsRef = React.useRef<HTMLDivElement>(null)
   const inView = useInView(statsRef, { once: true, margin: '-50px' })
 
+  // 视差滚动
+  const [scrollY, setScrollY] = React.useState(0)
+  React.useEffect(() => {
+    let raf = 0
+    function onScroll() {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        setScrollY(window.scrollY)
+        raf = 0
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+
   React.useEffect(() => {
     hydrateFromTokens()
   }, [hydrateFromTokens])
@@ -111,14 +129,22 @@ export function Hero() {
       id="hero"
       className="relative isolate flex min-h-[78vh] items-center justify-center overflow-hidden"
     >
-      {/* 背景图 */}
-      <LazyImage
-        src={HERO_IMAGE}
-        alt="九四班 · 班级背景"
-        aspectRatio="wide"
-        className="absolute inset-0 -z-10 size-full object-cover"
-        imgClassName="size-full object-cover"
-      />
+      {/* 背景图（视差） */}
+      <div
+        className="absolute inset-0 -z-10 size-full overflow-hidden"
+        style={{
+          transform: `translate3d(0, ${scrollY * 0.25}px, 0) scale(1.15)`,
+          transition: 'transform 0.08s linear',
+        }}
+      >
+        <LazyImage
+          src={HERO_IMAGE}
+          alt="九四班 · 班级背景"
+          aspectRatio="wide"
+          className="size-full"
+          imgClassName="size-full object-cover"
+        />
+      </div>
 
       {/* emerald 渐变遮罩 */}
       <div

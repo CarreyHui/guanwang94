@@ -36,6 +36,7 @@ import {
 import type { Confession, ConfessionType, ConfessionColor } from '@/lib/types'
 import { relativeTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { EmptyState, CardSkeleton } from '@/components/empty-state'
 
 const MAX_CONTENT = 300
 
@@ -512,26 +513,33 @@ export function ConfessionSection() {
 
       {/* 列表 */}
       {listQuery.isLoading ? (
-        <div className="flex h-48 items-center justify-center text-muted-foreground">
-          <Loader2 className="size-6 animate-spin" />
-          <span className="ml-2 text-sm">加载中…</span>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       ) : listQuery.isError ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">加载失败</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => listQuery.refetch()}
-            className="h-9"
-          >
-            重试
-          </Button>
-        </div>
+        <EmptyState
+          icon="search"
+          title="加载失败"
+          description="网络或服务出了点小问题，请稍后重试"
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => listQuery.refetch()}
+              className="h-9 gap-1.5"
+            >
+              <Loader2 className="size-4" /> 重试
+            </Button>
+          }
+        />
       ) : (listQuery.data?.items ?? []).length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">还没有表白，快来第一个发布吧</p>
-        </div>
+        <EmptyState
+          icon="heart"
+          title="还没有表白，快来第一个发布吧"
+          description="说出心里话，让同学们感受到你的心意"
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <AnimatePresence mode="popLayout">

@@ -49,6 +49,7 @@ import {
 import type { Message } from '@/lib/types'
 import { relativeTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { EmptyState, CardSkeleton } from '@/components/empty-state'
 
 const MAX_CONTENT = 500
 
@@ -540,28 +541,33 @@ export function MessageSection() {
 
       {/* 列表 */}
       {listQuery.isLoading ? (
-        <div className="flex h-48 items-center justify-center text-muted-foreground">
-          <Loader2 className="size-6 animate-spin" />
-          <span className="ml-2 text-sm">加载中…</span>
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <CardSkeleton key={i} variant="compact" />
+          ))}
         </div>
       ) : listQuery.isError ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">加载失败</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => listQuery.refetch()}
-            className="h-9"
-          >
-            重试
-          </Button>
-        </div>
+        <EmptyState
+          icon="search"
+          title="加载失败"
+          description="网络或服务出了点小问题，请稍后重试"
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => listQuery.refetch()}
+              className="h-9 gap-1.5"
+            >
+              <Loader2 className="size-4" /> 重试
+            </Button>
+          }
+        />
       ) : (listQuery.data?.items ?? []).length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">
-            {search ? '没有符合条件的结果' : '还没有留言，快来第一个留言吧'}
-          </p>
-        </div>
+        <EmptyState
+          icon="message"
+          title={search ? '没有符合条件的结果' : '还没有留言，快来第一个留言吧'}
+          description={search ? '试试换个关键词' : '你的反馈是我们前进的动力'}
+        />
       ) : (
         <div className="grid gap-3">
           <AnimatePresence mode="popLayout">
