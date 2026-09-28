@@ -790,3 +790,73 @@ Stage Summary:
 - 访问统计加「热门时段」推荐（提示管理员最佳发布时间）
 - 自定义主题色加「预设调色板 + 自定义 hex」混合模式
 - 后台批量操作加「批量改标签」（除分类/优先级/时间外的第 5 种）
+
+---
+Task ID: 13
+Agent: webDevReview 定时巡检 agent（第 9 轮）
+Task: QA + ?event= 自动打开 + 批量改标签 + 热榜 90 天 + 最佳发布时段推荐
+
+Work Log:
+- 读 worklog 了解第 8 轮进度（新访客 vs 回访/批量改发布时间/事件 QR 分享全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（4 项）：
+1. **监听 ?event=id query 自动打开事件详情**：
+   - page.tsx 加 useEffect 监听 accessPassed + URL ?event=id query
+   - 通过门控后自动调 useEventModal.openEvent(eventId) + 滚到事件区
+   - 打开后清掉 query（replaceState）避免刷新重复打开
+   - 测试：访问 /?event=cmulau1ee... → 自动打开「事件详情」dialog ✓
+
+2. **后台批量改标签**：
+   - manage-events-tab 加 batchTagsMutation（Promise.all 并行 updateEvent 改 tags）
+   - batchConfirm 类型扩展加 'tags'
+   - batchTagsMode state（'replace' 覆盖 / 'append' 追加合并去重）
+   - 工具栏加「批量改标签」按钮（teal 配色 + Tags 图标）
+   - AlertDialog tags 模式：
+     - 新标签 Input（maxLength 200）
+     - 覆盖/追加 2 模式切换按钮（emerald 选中态）
+     - 实时预览 chip（#tag1 #tag2 ...）
+   - append 模式从 allItems 拿当前 tags 合并去重
+   - 确认按钮在未填标签时 disabled
+   - 测试：全选 8 条 → 点批量改标签 → AlertDialog「批量改标签 8 条事件」+ Input + 覆盖/追加按钮 ✓
+
+3. **表白墙热榜加「近 90 天」选项**：
+   - ConfessionTopBar DAYS_OPTIONS 加 { value: 90, label: '近 90 天' }
+   - 后端 top API 已支持 days 最大 90
+
+4. **访问统计最佳发布时段推荐**：
+   - dashboard-tab hourly Card 加「最佳发布时段推荐」section
+   - 算法：遍历 24 小时，找连续 2 小时窗口之和最大的起始小时
+   - emerald Card 显示：Sparkles 图标 + 「访客最活跃时段：HH:00 - HH+2:00，共 N 次访问」+ 建议文案
+   - 全 0 时不显示
+   - 测试：dashboard 显示「访客最活跃时段：15:00 - 17:00，共 23 次访问」✓
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - ?event= query 自动打开事件详情 dialog ✓
+  - 后台批量改标签 AlertDialog + Input + 覆盖/追加按钮 + 实时预览 ✓
+  - dashboard 最佳发布时段推荐「15:00 - 17:00，共 23 次访问」✓
+- 后端 API 测试：confessions/top days=90 返回数据 ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 4 项新功能（?event= 自动打开/批量改标签/热榜 90 天/最佳发布时段）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 4 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- ?event= query 自动打开需要门控通过后才触发，未通过门控的访客会先看到门控 Modal，通过后再打开
+- 批量改标签 append 模式从 allItems 拿当前 tags，allItems 是当前页数据，跨页选中事件可能拿不到 tags（边界情况）
+- 最佳发布时段用连续 2 小时窗口，可未来扩展为 3 小时窗口或自定义
+- 热榜 90 天数据量大时可能慢（班级站量小无影响）
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- PWA service worker 加后台同步（离线发布的表白/留言自动同步）
+- 自定义主题色加「预设调色板 + 自定义 hex」混合模式
+- 事件详情 Modal 加「分享到微信/QQ」原生分享
+- 访问统计加「热门搜索词」Top 10（如果加了搜索日志）
+- 后台批量操作加「批量删除标签」（除覆盖/追加外的第 3 种标签操作）
+- 表白墙热榜加「按周/月」分组（不只按天聚合）

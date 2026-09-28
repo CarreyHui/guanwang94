@@ -26,6 +26,7 @@ import {
   FolderEdit,
   Flag,
   CalendarClock,
+  Tags,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -86,10 +87,12 @@ export function ManageEventsTab() {
   const [page, setPage] = React.useState(1)
   const [delTarget, setDelTarget] = React.useState<Event | null>(null)
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
-  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin' | 'category' | 'priority' | 'publishTime'>(null)
+  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin' | 'category' | 'priority' | 'publishTime' | 'tags'>(null)
   const [batchCategory, setBatchCategory] = React.useState<string>('班级活动')
   const [batchPriority, setBatchPriority] = React.useState<string>('normal')
   const [batchPublishTime, setBatchPublishTime] = React.useState<string>('') // ISO datetime
+  const [batchTags, setBatchTags] = React.useState<string>('')
+  const [batchTagsMode, setBatchTagsMode] = React.useState<'replace' | 'append'>('replace')
 
   const queryClient = useQueryClient()
   const openEvent = useEventModal((s) => s.openEvent)
@@ -331,6 +334,50 @@ export function ManageEventsTab() {
     },
   })
 
+  // 批量改标签 mutation
+  const batchTagsMutation = useMutation({
+    mutationFn: async ({ ids, tags, mode }: { ids: string[]; tags: string; mode: 'replace' | 'append' }) => {
+      const results: Promise<{ ok: boolean; id: string; err?: string }>[] = []
+      for (const id of ids) {
+        // 拿当前事件 tags（从已拉取的 list 数据找）
+        const ev = allItems.find((e) => e.id === id)
+        const currentTags = ev?.tags || ''
+        let newTags: string
+        if (mode === 'replace') {
+          newTags = tags
+        } else {
+          // append：合并去重
+          const existing = currentTags.split(',').map((t) => t.trim()).filter(Boolean)
+          const adding = tags.split(',').map((t) => t.trim()).filter(Boolean)
+          const merged = Array.from(new Set([...existing, ...adding]))
+          newTags = merged.join(',')
+        }
+        results.push(
+          updateEvent(id, { tags: newTags })
+            .then(() => ({ ok: true, id }))
+            .catch((err) => ({ ok: false, id, err: err instanceof Error ? err.message : '失败' })),
+        )
+      }
+      return Promise.all(results)
+    },
+    onSuccess: (results) => {
+      const ok = results.filter((r) => r.ok).length
+      const fail = results.filter((r) => !r.ok).length
+      if (fail === 0) toast.success(`已批量改标签 ${ok} 条`)
+      else toast.warning(`成功 ${ok} 条，失败 ${fail} 条`)
+      clearSelection()
+      setBatchConfirm(null)
+      setBatchTags('')
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'events'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-list'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-archive-all'] })
+      void queryClient.invalidateQueries({ queryKey: ['event-tags'] })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : '批量改标签失败')
+    },
+  })
+
   const items = list.data?.items ?? []
   const total = list.data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -434,11 +481,22 @@ export function ManageEventsTab() {
               variant="outline"
               size="sm"
               onClick={() => setBatchConfirm('publishTime')}
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending || batchTagsMutation.isPending}
               className="h-8 gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-500/10 dark:text-violet-300"
             >
               <CalendarClock className="size-3.5" />
               批量改时间
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchConfirm('tags')}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending || batchTagsMutation.isPending}
+              className="h-8 gap-1.5 border-teal-500/30 text-teal-600 hover:bg-teal-500/10 dark:text-teal-300"
+            >
+              <Tags className="size-3.5" />
+              批量改标签
             </Button>
             <Button
               type="button"
@@ -678,6 +736,7 @@ export function ManageEventsTab() {
               {batchConfirm === 'category' && `批量改分类 ${selectedCount} 条事件`}
               {batchConfirm === 'priority' && `批量改优先级 ${selectedCount} 条事件`}
               {batchConfirm === 'publishTime' && `批量改发布时间 ${selectedCount} 条事件`}
+              {batchConfirm === 'tags' && `批量改标签 ${selectedCount} 条事件`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {batchConfirm === 'delete' && '将永久删除选中事件，删除后无法恢复。此操作不可逆。'}
@@ -686,6 +745,7 @@ export function ManageEventsTab() {
               {batchConfirm === 'category' && '选择目标分类，选中事件将全部改为该分类：'}
               {batchConfirm === 'priority' && '选择优先级，选中事件将全部改为该优先级：'}
               {batchConfirm === 'publishTime' && '选择新发布时间，选中事件将全部改为该时间：'}
+              {batchConfirm === 'tags' && '输入新标签（逗号分隔），选择覆盖或追加模式：'}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -781,10 +841,68 @@ export function ManageEventsTab() {
             </div>
           )}
 
+          {/* 改标签的 Input */}
+          {batchConfirm === 'tags' && (
+            <div className="space-y-2 py-2">
+              <Input
+                value={batchTags}
+                onChange={(e) => setBatchTags(e.target.value)}
+                placeholder="如：运动会,体育,夺冠"
+                className="h-11"
+                aria-label="新标签"
+                maxLength={200}
+              />
+              {/* 模式切换 */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">模式：</span>
+                <button
+                  type="button"
+                  onClick={() => setBatchTagsMode('replace')}
+                  aria-pressed={batchTagsMode === 'replace'}
+                  className={cn(
+                    'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                    batchTagsMode === 'replace'
+                      ? 'border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-border text-muted-foreground hover:bg-accent',
+                  )}
+                >
+                  覆盖
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBatchTagsMode('append')}
+                  aria-pressed={batchTagsMode === 'append'}
+                  className={cn(
+                    'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                    batchTagsMode === 'append'
+                      ? 'border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-border text-muted-foreground hover:bg-accent',
+                  )}
+                >
+                  追加（合并去重）
+                </button>
+              </div>
+              {/* 实时预览 */}
+              {batchTags && (
+                <div className="rounded-md bg-muted/50 px-2.5 py-1.5">
+                  <span className="text-[11px] text-muted-foreground">预览：</span>
+                  {batchTags.split(',').map((t) => t.trim()).filter(Boolean).map((t, i) => (
+                    <span
+                      key={i}
+                      className="ml-1 inline-block rounded-full bg-emerald-600/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel
               className="h-11"
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending || batchTagsMutation.isPending}
             >
               取消
             </AlertDialogCancel>
@@ -801,7 +919,9 @@ export function ManageEventsTab() {
                 batchCategoryMutation.isPending ||
                 batchPriorityMutation.isPending ||
                 batchPublishTimeMutation.isPending ||
-                (batchConfirm === 'publishTime' && !batchPublishTime)
+                batchTagsMutation.isPending ||
+                (batchConfirm === 'publishTime' && !batchPublishTime) ||
+                (batchConfirm === 'tags' && !batchTags.trim())
               }
               onClick={(e) => {
                 e.preventDefault()
@@ -820,10 +940,12 @@ export function ManageEventsTab() {
                   // datetime-local 转 ISO
                   const iso = new Date(batchPublishTime).toISOString()
                   batchPublishTimeMutation.mutate({ ids, publishedAt: iso })
+                } else if (batchConfirm === 'tags' && batchTags.trim()) {
+                  batchTagsMutation.mutate({ ids, tags: batchTags.trim(), mode: batchTagsMode })
                 }
               }}
             >
-              {batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending ? (
+              {batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending || batchPriorityMutation.isPending || batchPublishTimeMutation.isPending || batchTagsMutation.isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   处理中…

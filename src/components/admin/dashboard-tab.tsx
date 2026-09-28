@@ -35,6 +35,7 @@ import {
   Globe,
   UserPlus,
   UserCheck,
+  Sparkles,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -516,6 +517,36 @@ export function DashboardTab() {
                   <span>23</span>
                 </div>
               </div>
+
+              {/* 最佳发布时段推荐 */}
+              {(() => {
+                const hourly = hourlyQuery.data?.hourly ?? []
+                if (hourly.length === 0 || hourly.every((c) => c === 0)) return null
+                // 找访问量最高的 3 个小时（连续 2 小时窗口之和最大）
+                const windows: { start: number; total: number }[] = []
+                for (let h = 0; h < 24; h++) {
+                  const next = (h + 1) % 24
+                  windows.push({ start: h, total: hourly[h] + hourly[next] })
+                }
+                windows.sort((a, b) => b.total - a.total)
+                const best = windows[0]
+                if (!best || best.total === 0) return null
+                return (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      <Sparkles className="size-3.5" />
+                      最佳发布时段推荐
+                    </div>
+                    <p className="mt-1 text-sm text-foreground">
+                      访客最活跃时段：<span className="font-bold text-emerald-700 dark:text-emerald-300">{best.start}:00 - {(best.start + 2) % 24}:00</span>
+                      ，共 {best.total} 次访问
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      建议在该时段发布重要事件，可获得更高曝光
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* 一周 × 24 小时热力图 */}
               <div>

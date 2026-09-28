@@ -17,11 +17,13 @@ import {
   EventDetailModal,
 } from '@/components/sections'
 import { useAppStore } from '@/store/use-app-store'
+import { useEventModal } from '@/store/use-event-modal'
 
 export default function Home() {
   const accessPassed = useAppStore((s) => s.accessPassed)
   const isAdmin = useAppStore((s) => s.isAdmin)
   const hydrateFromTokens = useAppStore((s) => s.hydrateFromTokens)
+  const openEvent = useEventModal((s) => s.openEvent)
 
   // 启动时从 localStorage token 反推鉴权状态
   useEffect(() => {
@@ -43,6 +45,27 @@ export default function Home() {
     }).catch(() => {})
     return () => ctrl.abort()
   }, [accessPassed])
+
+  // 监听 ?event=id query：通过门控后自动打开事件详情
+  useEffect(() => {
+    if (!accessPassed) return
+    const params = new URLSearchParams(window.location.search)
+    const eventId = params.get('event')
+    if (eventId) {
+      // 滚到事件区
+      requestAnimationFrame(() => {
+        const eventsSection = document.getElementById('events')
+        if (eventsSection) {
+          eventsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
+      openEvent(eventId)
+      // 清掉 query，避免刷新重复打开
+      const url = new URL(window.location.href)
+      url.searchParams.delete('event')
+      window.history.replaceState(null, '', url.toString())
+    }
+  }, [accessPassed, openEvent])
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
