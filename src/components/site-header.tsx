@@ -56,10 +56,26 @@ export function SiteHeader() {
   const [loginOpen, setLoginOpen] = React.useState(false)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
+  const [scrolled, setScrolled] = React.useState(false)
 
   React.useEffect(() => {
     hydrateFromTokens()
     setMounted(true)
+    // 滚动监听：超过 100px 加阴影
+    let raf = 0
+    function onScroll() {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 100)
+        raf = 0
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [hydrateFromTokens])
 
   async function handleLogout() {
@@ -75,9 +91,10 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 w-full border-b border-emerald-600/15',
-        'bg-background/80 backdrop-blur-lg',
-        'supports-[backdrop-filter]:bg-background/70',
+        'sticky top-0 z-50 w-full border-b transition-all duration-300',
+        scrolled
+          ? 'border-emerald-600/20 bg-background/90 shadow-md shadow-emerald-950/5 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75 dark:shadow-black/20'
+          : 'border-emerald-600/15 bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-background/70',
       )}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">

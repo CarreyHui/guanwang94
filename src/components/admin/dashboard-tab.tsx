@@ -49,6 +49,7 @@ import {
   getTrend,
   getTopEvents,
   getRecentVisits,
+  getHourlyStats,
 } from '@/lib/api'
 import type { OverviewStats, TrendPoint, TopEvent, Visit } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -183,6 +184,10 @@ export function DashboardTab() {
   const recentVisits = useQuery<Visit[]>({
     queryKey: ['admin', 'recent-visits', 20],
     queryFn: () => getRecentVisits(20),
+  })
+  const hourlyQuery = useQuery({
+    queryKey: ['admin', 'hourly'],
+    queryFn: getHourlyStats,
   })
 
   const trendData = trend.data ?? []
@@ -443,6 +448,133 @@ export function DashboardTab() {
           ))
         })()}
       </section>
+
+      {/* 访问小时分布 + 一周热力图 */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="size-4 text-emerald-600" />
+            访问时间分布（近 7 天）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hourlyQuery.isLoading ? (
+            <CenterSpinner />
+          ) : hourlyQuery.isError ? (
+            <EmptyHint hint="加载失败" />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {/* 24 小时柱状图 */}
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  按小时分布
+                </p>
+                <div className="flex h-32 items-end gap-0.5">
+                  {hourlyQuery.data?.hourly.map((count, h) => {
+                    const max = Math.max(1, ...hourlyQuery.data.hourly)
+                    const pct = (count / max) * 100
+                    return (
+                      <div
+                        key={h}
+                        className="group relative flex-1"
+                        title={`${h}:00 - ${count} 次访问`}
+                      >
+                        <div
+                          className="w-full rounded-t bg-gradient-to-t from-emerald-500 to-teal-400 transition-all hover:from-emerald-600 hover:to-teal-500"
+                          style={{ height: `${Math.max(2, pct)}%` }}
+                        />
+                        {/* hover tooltip */}
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] text-background group-hover:block">
+                          {h}:00 → {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                  <span>0</span>
+                  <span>6</span>
+                  <span>12</span>
+                  <span>18</span>
+                  <span>23</span>
+                </div>
+              </div>
+
+              {/* 一周 × 24 小时热力图 */}
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  一周 × 24 小时热力图
+                </p>
+                <div className="overflow-x-auto">
+                  <div className="inline-block min-w-full">
+                    {/* 表头：小时 */}
+                    <div className="flex">
+                      <div className="w-8 shrink-0" />
+                      <div className="flex flex-1 gap-0.5">
+                        {Array.from({ length: 24 }).map((_, h) => (
+                          <div
+                            key={h}
+                            className="flex-1 text-center text-[9px] text-muted-foreground"
+                          >
+                            {h % 3 === 0 ? h : ''}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 行：周一..周日 */}
+                    {['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((day, di) => (
+                      <div key={day} className="flex items-center gap-0.5">
+                        <div className="w-8 shrink-0 text-[10px] text-muted-foreground">{day}</div>
+                        <div className="flex flex-1 gap-0.5">
+                          {hourlyQuery.data?.heatmap[di]?.map((count, hi) => {
+                            const intensity = count / (hourlyQuery.data?.maxCell || 1)
+                            // emerald 色阶：0=透明，1=深 emerald
+                            const bg = intensity === 0
+                              ? 'bg-muted'
+                              : intensity < 0.25
+                                ? 'bg-emerald-500/20'
+                                : intensity < 0.5
+                                  ? 'bg-emerald-500/40'
+                                  : intensity < 0.75
+                                    ? 'bg-emerald-500/70'
+                                    : 'bg-emerald-600'
+                            return (
+                              <div
+                                key={hi}
+                                className={cn(
+                                  'group relative aspect-square flex-1 rounded-sm transition-all hover:ring-2 hover:ring-emerald-500/40',
+                                  bg,
+                                )}
+                                title={`${day} ${hi}:00 - ${count} 次`}
+                              >
+                                {count > 0 && intensity >= 0.5 && (
+                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[8px] font-medium text-white">
+                                    {count}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* 色阶图例 */}
+                <div className="mt-2 flex items-center justify-end gap-1.5 text-[10px] text-muted-foreground">
+                  <span>少</span>
+                  <div className="size-2.5 rounded-sm bg-muted" />
+                  <div className="size-2.5 rounded-sm bg-emerald-500/20" />
+                  <div className="size-2.5 rounded-sm bg-emerald-500/40" />
+                  <div className="size-2.5 rounded-sm bg-emerald-500/70" />
+                  <div className="size-2.5 rounded-sm bg-emerald-600" />
+                  <span>多</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 最近访问记录 */}
       <Card className="gap-2 py-4">

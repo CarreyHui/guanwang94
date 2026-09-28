@@ -488,6 +488,19 @@ export function getRecentVisits(limit = 20): Promise<Visit[]> {
   return apiGet<Visit[]>('/api/stats/recent-visits', { limit })
 }
 
+// 小时分布 + 热力图
+export interface HourlyStats {
+  hourly: number[]
+  heatmap: number[][]
+  total: number
+  maxCell: number
+  days: number
+}
+
+export function getHourlyStats(): Promise<HourlyStats> {
+  return apiGet<HourlyStats>('/api/stats/hourly')
+}
+
 // ===== 上报访问 =====
 export function trackVisit(payload: TrackPayload): Promise<TrackResponse> {
   return apiPost<TrackResponse>('/api/track', payload)

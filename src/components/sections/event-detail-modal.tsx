@@ -23,6 +23,8 @@ import {
   Sparkles,
   CalendarPlus,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -104,6 +106,65 @@ export function EventDetailModal() {
   const selectedId = useEventModal((s) => s.selectedId)
   const closeEvent = useEventModal((s) => s.closeEvent)
   const openEvent = useEventModal((s) => s.openEvent)
+
+  // 拉所有事件 id 列表（轻量，只取 id），用于翻页
+  const [eventIds, setEventIds] = React.useState<string[]>([])
+  React.useEffect(() => {
+    if (!open) {
+      setEventIds([])
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const ids: string[] = []
+      let page = 1
+      const pageSize = 50
+      // 最多拉 5 页（250 条）
+      while (page <= 5) {
+        try {
+          const res = await listEvents({ page, pageSize })
+          ids.push(...res.items.map((e) => e.id))
+          if (ids.length >= res.total || res.items.length < pageSize) break
+          page++
+        } catch {
+          break
+        }
+      }
+      if (!cancelled) setEventIds(ids)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  // 当前事件在列表中的索引
+  const currentIndex = selectedId ? eventIds.indexOf(selectedId) : -1
+  const hasPrev = currentIndex > 0
+  const hasNext = currentIndex >= 0 && currentIndex < eventIds.length - 1
+
+  function handlePrev() {
+    if (hasPrev) openEvent(eventIds[currentIndex - 1])
+  }
+  function handleNext() {
+    if (hasNext) openEvent(eventIds[currentIndex + 1])
+  }
+
+  // 键盘左右键翻页
+  React.useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowLeft' && hasPrev) {
+        e.preventDefault()
+        handlePrev()
+      } else if (e.key === 'ArrowRight' && hasNext) {
+        e.preventDefault()
+        handleNext()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, hasPrev, hasNext, currentIndex, eventIds])
 
   const [event, setEvent] = React.useState<Event | null>(null)
   const [loading, setLoading] = React.useState(false)
@@ -548,6 +609,38 @@ export function EventDetailModal() {
                       <CalendarPlus className="size-4" />
                       加入日历
                     </Button>
+                    {/* 翻页按钮 */}
+                    {eventIds.length > 1 && (
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handlePrev}
+                          disabled={!hasPrev}
+                          className="h-9 gap-1.5"
+                          aria-label="上一条事件"
+                        >
+                          <ChevronLeft className="size-4" />
+                          上一条
+                        </Button>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {currentIndex >= 0 ? currentIndex + 1 : '-'}/{eventIds.length}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleNext}
+                          disabled={!hasNext}
+                          className="h-9 gap-1.5"
+                          aria-label="下一条事件"
+                        >
+                          下一条
+                          <ChevronRight className="size-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

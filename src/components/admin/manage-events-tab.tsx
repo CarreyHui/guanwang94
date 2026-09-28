@@ -23,11 +23,19 @@ import {
   ChevronRight,
   Plus,
   CheckSquare,
+  FolderEdit,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -46,7 +54,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { listEvents, deleteEvent, toggleEventPin } from '@/lib/api'
+import { listEvents, deleteEvent, toggleEventPin, updateEvent } from '@/lib/api'
 import type { Event, EventListResponse } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useEventModal } from '@/store/use-event-modal'
@@ -75,7 +83,8 @@ export function ManageEventsTab() {
   const [page, setPage] = React.useState(1)
   const [delTarget, setDelTarget] = React.useState<Event | null>(null)
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
-  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin'>(null)
+  const [batchConfirm, setBatchConfirm] = React.useState<null | 'delete' | 'pin' | 'unpin' | 'category'>(null)
+  const [batchCategory, setBatchCategory] = React.useState<string>('班级活动')
 
   const queryClient = useQueryClient()
   const openEvent = useEventModal((s) => s.openEvent)
@@ -225,6 +234,37 @@ export function ManageEventsTab() {
     },
   })
 
+  // 批量改分类 mutation
+  const batchCategoryMutation = useMutation({
+    mutationFn: async ({ ids, category }: { ids: string[]; category: string }) => {
+      const results: Promise<{ ok: boolean; id: string; err?: string }>[] = []
+      for (const id of ids) {
+        results.push(
+          updateEvent(id, { category })
+            .then(() => ({ ok: true, id }))
+            .catch((err) => ({ ok: false, id, err: err instanceof Error ? err.message : '失败' })),
+        )
+      }
+      return Promise.all(results)
+    },
+    onSuccess: (results) => {
+      const ok = results.filter((r) => r.ok).length
+      const fail = results.filter((r) => !r.ok).length
+      if (fail === 0) toast.success(`已批量改分类 ${ok} 条`)
+      else toast.warning(`成功 ${ok} 条，失败 ${fail} 条`)
+      clearSelection()
+      setBatchConfirm(null)
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'events'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-list'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-archive-all'] })
+      void queryClient.invalidateQueries({ queryKey: ['events-pinned'] })
+      void queryClient.invalidateQueries({ queryKey: ['event-tags'] })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : '批量改分类失败')
+    },
+  })
+
   const items = list.data?.items ?? []
   const total = list.data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -295,11 +335,22 @@ export function ManageEventsTab() {
               variant="outline"
               size="sm"
               onClick={() => setBatchConfirm('delete')}
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending}
               className="h-8 gap-1.5 border-rose-500/30 text-rose-600 hover:bg-rose-500/10 dark:text-rose-300"
             >
               <Trash2 className="size-3.5" />
               批量删除
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchConfirm('category')}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending}
+              className="h-8 gap-1.5 border-sky-500/30 text-sky-600 hover:bg-sky-500/10 dark:text-sky-300"
+            >
+              <FolderEdit className="size-3.5" />
+              批量改分类
             </Button>
             <Button
               type="button"
@@ -536,15 +587,38 @@ export function ManageEventsTab() {
               {batchConfirm === 'delete' && `确认批量删除 ${selectedCount} 条事件？`}
               {batchConfirm === 'pin' && `确认批量置顶 ${selectedCount} 条事件？`}
               {batchConfirm === 'unpin' && `确认取消置顶 ${selectedCount} 条事件？`}
+              {batchConfirm === 'category' && `批量改分类 ${selectedCount} 条事件`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {batchConfirm === 'delete' && '将永久删除选中事件，删除后无法恢复。此操作不可逆。'}
               {batchConfirm === 'pin' && '选中事件将设为置顶状态（已是置顶的会跳过）。'}
               {batchConfirm === 'unpin' && '选中事件将取消置顶状态（已非置顶的会跳过）。'}
+              {batchConfirm === 'category' && '选择目标分类，选中事件将全部改为该分类：'}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* 改分类的 Select */}
+          {batchConfirm === 'category' && (
+            <div className="py-2">
+              <Select value={batchCategory} onValueChange={setBatchCategory}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="班级活动">班级活动</SelectItem>
+                  <SelectItem value="学习通知">学习通知</SelectItem>
+                  <SelectItem value="重要公告">重要公告</SelectItem>
+                  <SelectItem value="校园新闻">校园新闻</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-11" disabled={batchPinMutation.isPending || batchDeleteMutation.isPending}>
+            <AlertDialogCancel
+              className="h-11"
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending}
+            >
               取消
             </AlertDialogCancel>
             <AlertDialogAction
@@ -554,7 +628,7 @@ export function ManageEventsTab() {
                   ? 'bg-rose-600 hover:bg-rose-600/90'
                   : 'bg-emerald-600 hover:bg-emerald-600/90',
               )}
-              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending}
+              disabled={batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending}
               onClick={(e) => {
                 e.preventDefault()
                 const ids = Array.from(selectedIds)
@@ -564,10 +638,12 @@ export function ManageEventsTab() {
                   batchPinMutation.mutate({ ids, pin: true })
                 } else if (batchConfirm === 'unpin') {
                   batchPinMutation.mutate({ ids, pin: false })
+                } else if (batchConfirm === 'category') {
+                  batchCategoryMutation.mutate({ ids, category: batchCategory })
                 }
               }}
             >
-              {batchPinMutation.isPending || batchDeleteMutation.isPending ? (
+              {batchPinMutation.isPending || batchDeleteMutation.isPending || batchCategoryMutation.isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   处理中…

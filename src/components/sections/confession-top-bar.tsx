@@ -7,11 +7,10 @@
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Flame, Trophy, Crown, Medal, Award, Heart } from 'lucide-react'
+import { Flame, Crown, Medal, Award } from 'lucide-react'
 
 import { getConfessionTop, type ConfessionTopItem } from '@/lib/api'
 import { useAppStore } from '@/store/use-app-store'
-import { relativeTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const TYPE_LABEL: Record<string, string> = {
@@ -36,18 +35,25 @@ const RANK_ICONS = [
   { icon: Award, color: 'text-orange-700', bg: 'bg-orange-700/15' }, // 🥉
 ]
 
+const DAYS_OPTIONS: { value: number; label: string }[] = [
+  { value: 7, label: '近 7 天' },
+  { value: 30, label: '近 30 天' },
+  { value: 0, label: '全部' },
+]
+
 export function ConfessionTopBar() {
   const accessPassed = useAppStore((s) => s.accessPassed)
+  const [days, setDays] = React.useState(7)
 
   const topQuery = useQuery({
-    queryKey: ['confessions-top', 7, 5],
-    queryFn: () => getConfessionTop(7, 5),
+    queryKey: ['confessions-top', days, 5],
+    queryFn: () => getConfessionTop(days, 5),
     enabled: accessPassed,
     staleTime: 5 * 60 * 1000, // 5 分钟缓存
   })
 
   const items = topQuery.data?.items ?? []
-  if (items.length === 0) return null
+  const currentLabel = DAYS_OPTIONS.find((d) => d.value === days)?.label || '近 7 天'
 
   return (
     <motion.div
@@ -55,21 +61,59 @@ export function ConfessionTopBar() {
       animate={{ opacity: 1, y: 0 }}
       className="mb-6 overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-4 shadow-sm dark:from-amber-950/20 dark:via-orange-950/20 dark:to-rose-950/20 sm:p-5"
     >
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
           <Flame className="size-3.5" />
-          近 7 天热榜
+          {currentLabel}热榜
         </span>
         <span className="text-xs text-muted-foreground">
           按点赞 + 反应热度排序
         </span>
+        {/* 时间维度切换 */}
+        <div className="ml-auto flex items-center gap-0.5 rounded-full bg-card/60 p-0.5 backdrop-blur-sm">
+          {DAYS_OPTIONS.map((opt) => {
+            const active = days === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDays(opt.value)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                  active
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-amber-700 dark:hover:text-amber-300',
+                )}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {items.map((item, i) => (
-          <TopCard key={item.id} item={item} rank={i} />
-        ))}
-      </div>
+      {topQuery.isLoading ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="shimmer h-32 rounded-lg border border-amber-500/20 bg-card/40"
+            />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Flame className="size-6 opacity-40" />
+          <p>{currentLabel}还没有表白，快来第一个发布吧</p>
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {items.map((item, i) => (
+            <TopCard key={item.id} item={item} rank={i} />
+          ))}
+        </div>
+      )}
     </motion.div>
   )
 }

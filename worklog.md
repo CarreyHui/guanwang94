@@ -491,3 +491,77 @@ Stage Summary:
 - 事件详情 Modal 加「上一条/下一条」翻页
 - 访问统计的地理分布（基于 ipHash 不可逆 + 简单地理库）
 - 站点配置加自定义 CSS 主题色 hex 输入（不只 6 选 1）
+
+---
+Task ID: 9
+Agent: webDevReview 定时巡检 agent（第 5 轮）
+Task: QA + 热榜时间切换 + 事件翻页 + 批量改分类 + 访问热力图 + Header 滚动阴影
+
+Work Log:
+- 读 worklog 了解第 4 轮进度（主题色/URL 持久化/批量操作/热榜/样式增强全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（5 项）：
+1. **表白墙热榜时间维度切换（7/30/全部）**：
+   - 后端 `/api/confessions/top` 支持 days=0 表示全部历史（不限制 since）
+   - 前端 ConfessionTopBar 加 days state + 3 按钮切换组（amber 选中态）
+   - 加载中显示 shimmer 骨架屏，空数据显示 Flame + 提示文案
+   - 当前时段标签动态变化（近 7 天/近 30 天/全部热榜）
+   - 测试：切到「全部」+ 切回「近 7 天」✓
+
+2. **事件详情 Modal 上一条/下一条翻页**：
+   - Modal 打开时拉所有事件 id 列表（分页拉，最多 5 页 250 条）
+   - 找当前 selectedId 在列表中索引，hasPrev/hasNext 控制
+   - 底部按钮区加「上一条」+「N/M 索引」+「下一条」（ml-auto 右对齐）
+   - 键盘左右键翻页（ArrowLeft/ArrowRight，input/textarea 内不触发）
+   - 测试：点第一条 → 「上一条」disabled → 点「下一条」→ 标题变成第 2 条「期中考试」+ 「上一条」可点 ✓
+
+3. **后台批量改分类**：
+   - manage-events-tab 加 batchCategoryMutation（Promise.all 并行 updateEvent）
+   - 工具栏加「批量改分类」按钮（sky 配色 + FolderEdit 图标）
+   - batchConfirm 类型扩展加 'category'
+   - AlertDialog 批量确认弹窗：当 batchConfirm='category' 时显示 Select（4 分类：班级活动/学习通知/重要公告/校园新闻）
+   - 测试：全选 8 条 → 点「批量改分类」→ AlertDialog「批量改分类 8 条事件」+ Select 默认「班级活动」✓
+
+4. **访问统计小时分布 + 一周热力图**：
+   - 新 API `/api/stats/hourly`：拉近 7 天所有 visit，聚合 24 小时分布 + 7×24 热力图（周一..周日）
+   - 前端 api.ts 加 getHourlyStats + HourlyStats 类型
+   - dashboard-tab 加「访问时间分布（近 7 天）」Card：
+     - 上半部：24 小时柱状图（emerald→teal 渐变，hover 显示具体小时+次数 tooltip）
+     - 下半部：7×24 热力图（aspect-square 格子 + 5 级 emerald 色阶 + 高强度格子内显示数字）
+     - 底部色阶图例（少→多）
+   - 测试：dashboard 显示「访问时间分布」+「按小时分布」+「一周 × 24 小时热力图」✓
+
+5. **样式增强**：
+   - **Header 滚动阴影**：超过 100px 滚动时 header 加 shadow-md + 更强 backdrop-blur-xl + emerald-950/5 阴影 + 0.3s 过渡动画（rAF 节流）
+
+校验：
+- `bun run lint`：0 错误 0 警告（删了 event-detail-modal 的 unused eslint-disable）
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 热榜 3 时间按钮显示 + 切换工作 ✓
+  - 事件详情翻页按钮 + 切换事件成功 ✓
+  - 后台批量改分类 AlertDialog + Select 显示 ✓
+  - dashboard 访问时间分布 + 热力图显示 ✓
+- 后端 API 测试：confessions/top days=0 返回全部 ✓；stats/hourly 返回 24 小时 + 7×24 heatmap ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 5 项新功能（热榜切换/事件翻页/批量改分类/访问热力图/Header 阴影）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 5 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- 事件详情翻页拉所有 id 列表（最多 250 条），事件数 > 250 时翻页范围不完整（班级站量小无影响）
+- 热力图在移动端可能横向滚动（已加 overflow-x-auto + min-w-full）
+- stats/hourly 拉近 7 天所有 visit 字段，访问量大时可能慢（班级站量小无影响）
+- 主题色 Applier 仅客户端运行，SSR 时用默认 emerald（首屏可能短暂闪烁，已用 localStorage 缓存缓解）
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 事件详情 Modal 加「相关事件」按分类之外的逻辑（按标签匹配）
+- 后台批量改优先级（除置顶/删除/改分类外的第 4 种批量操作）
+- 访问统计加「热门路径」Top 10（哪些页面访问最多）
+- 表白墙热榜加「类型筛选」（只看表白/感谢/祝福/吐槽/心愿的热榜）
+- 站点配置加自定义 CSS 主题色 hex 输入（不只 6 选 1）
+- PWA service worker 加后台同步（离线发布的表白/留言自动同步）
