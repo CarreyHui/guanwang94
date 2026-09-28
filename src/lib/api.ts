@@ -223,13 +223,14 @@ export function updateAccessToken(token: string): Promise<AccessTokenUpdateRespo
   return apiPut<AccessTokenUpdateResponse>('/api/access/token', { token })
 }
 
-// ===== 站点配置（标题/描述/Logo/OG image） =====
+// ===== 站点配置（标题/描述/Logo/OG image/主题色） =====
 export interface SiteConfigResponse {
   accessToken: string
   siteTitle: string
   siteDescription: string
   logoUrl: string
   ogImageUrl: string
+  themeColor: string
 }
 
 export interface SiteConfigUpdateInput {
@@ -237,6 +238,7 @@ export interface SiteConfigUpdateInput {
   siteDescription?: string
   logoUrl?: string
   ogImageUrl?: string
+  themeColor?: string
 }
 
 export function getSiteConfig(): Promise<SiteConfigResponse> {
@@ -413,6 +415,32 @@ export function toggleConfessionReaction(
   emoji: ReactionEmoji,
 ): Promise<ReactionToggleResponse> {
   return apiPatch<ReactionToggleResponse>('/api/confessions/react', { confessionId, emoji })
+}
+
+// ===== 表白墙热榜 =====
+export interface ConfessionTopItem {
+  id: string
+  nickname: string
+  content: string
+  type: string
+  color: string
+  likes: number
+  reactionCount: number
+  score: number
+  createdAt: string
+}
+
+export interface ConfessionTopResponse {
+  items: ConfessionTopItem[]
+  days: number
+  generatedAt: string
+}
+
+export function getConfessionTop(
+  days = 7,
+  limit = 10,
+): Promise<ConfessionTopResponse> {
+  return apiGet<ConfessionTopResponse>('/api/confessions/top', { days, limit })
 }
 
 export function deleteConfession(id: string): Promise<OkResponse> {

@@ -267,14 +267,96 @@ export function EventsSection() {
     hydrateFromTokens()
   }, [hydrateFromTokens])
 
-  const [category, setCategory] = React.useState<EventCategory>('全部')
-  const [queryInput, setQueryInput] = React.useState('')
-  const [query, setQuery] = React.useState('')
-  const [activeTag, setActiveTag] = React.useState<string>('')
-  const [priority, setPriority] = React.useState<string>('all') // all | high | normal
-  const [sort, setSort] = React.useState<'default' | 'latest' | 'oldest' | 'popular' | 'pinned'>('default')
-  const [pinnedOnly, setPinnedOnly] = React.useState(false)
-  const [showAdvanced, setShowAdvanced] = React.useState(false)
+  // ===== 从 URL hash 读初始筛选状态 =====
+  const readHash = React.useCallback(() => {
+    if (typeof window === 'undefined') return null
+    const hash = window.location.hash.replace(/^#/, '')
+    if (!hash) return null
+    try {
+      const params = new URLSearchParams(hash.startsWith('?') ? hash.slice(1) : hash)
+      return {
+        category: params.get('c') as EventCategory | null,
+        q: params.get('q'),
+        tag: params.get('t'),
+        priority: params.get('p'),
+        sort: params.get('s') as 'default' | 'latest' | 'oldest' | 'popular' | 'pinned' | null,
+        pinnedOnly: params.get('pi') === '1',
+      }
+    } catch {
+      return null
+    }
+  }, [])
+
+  const initial = readHash()
+  const [category, setCategory] = React.useState<EventCategory>(
+    initial?.category && ['全部', '班级活动', '学习通知', '重要公告', '校园新闻'].includes(initial.category)
+      ? initial.category
+      : '全部',
+  )
+  const [queryInput, setQueryInput] = React.useState(initial?.q || '')
+  const [query, setQuery] = React.useState(initial?.q || '')
+  const [activeTag, setActiveTag] = React.useState<string>(initial?.tag || '')
+  const [priority, setPriority] = React.useState<string>(
+    initial?.priority && ['all', 'high', 'normal'].includes(initial.priority)
+      ? initial.priority
+      : 'all',
+  )
+  const [sort, setSort] = React.useState<'default' | 'latest' | 'oldest' | 'popular' | 'pinned'>(
+    initial?.sort && ['default', 'latest', 'oldest', 'popular', 'pinned'].includes(initial.sort)
+      ? initial.sort
+      : 'default',
+  )
+  const [pinnedOnly, setPinnedOnly] = React.useState(initial?.pinnedOnly || false)
+  const [showAdvanced, setShowAdvanced] = React.useState(
+    !!(initial?.priority && initial.priority !== 'all') ||
+      !!(initial?.sort && initial.sort !== 'default') ||
+      !!(initial?.pinnedOnly),
+  )
+
+  // ===== 筛选变化时同步到 URL hash =====
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams()
+    if (category !== '全部') params.set('c', category)
+    if (query) params.set('q', query)
+    if (activeTag) params.set('t', activeTag)
+    if (priority !== 'all') params.set('p', priority)
+    if (sort !== 'default') params.set('s', sort)
+    if (pinnedOnly) params.set('pi', '1')
+
+    const hashStr = params.toString()
+    const newHash = hashStr ? `#events?${hashStr}` : '#events'
+
+    // 避免重复触发
+    if (window.location.hash !== newHash && window.location.hash.replace(/\?.*$/, '') !== '#events') {
+      window.history.replaceState(null, '', newHash)
+    } else if (window.location.hash !== newHash) {
+      window.history.replaceState(null, '', newHash)
+    }
+  }, [category, query, activeTag, priority, sort, pinnedOnly])
+
+  // 监听 hashchange（用户前进/后退）
+  React.useEffect(() => {
+    function onHashChange() {
+      const h = readHash()
+      if (!h) return
+      if (h.category) setCategory(h.category)
+      else setCategory('全部')
+      if (h.q !== null) {
+        setQueryInput(h.q)
+        setQuery(h.q)
+      }
+      if (h.tag !== null) setActiveTag(h.tag)
+      else setActiveTag('')
+      if (h.priority) setPriority(h.priority)
+      else setPriority('all')
+      if (h.sort) setSort(h.sort)
+      else setSort('default')
+      setPinnedOnly(h.pinnedOnly || false)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [readHash])
 
   // debounce 300ms
   React.useEffect(() => {

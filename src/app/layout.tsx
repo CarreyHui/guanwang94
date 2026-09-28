@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { ThemeColorApplier } from "@/components/theme-color-applier";
 import { db } from "@/lib/db";
 
 const geistSans = Geist({
@@ -177,6 +178,7 @@ export default function RootLayout({
       >
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />
+        <ThemeColorApplier />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -160,6 +160,28 @@ export function Hero() {
         )}
       />
 
+      {/* 装饰浮动光晕（hero 顶部 + 底部） */}
+      <div className="pointer-events-none absolute -left-20 top-1/4 size-72 rounded-full bg-emerald-400/20 blur-3xl motion-safe:animate-pulse" />
+      <div
+        className="pointer-events-none absolute -right-20 top-1/3 size-80 rounded-full bg-amber-400/15 blur-3xl motion-safe:animate-pulse"
+        style={{ animationDelay: '1.5s' }}
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 left-1/3 size-72 rounded-full bg-teal-300/20 blur-3xl motion-safe:animate-pulse"
+        style={{ animationDelay: '0.8s' }}
+      />
+
+      {/* 装饰网格 */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]"
+        style={{
+          backgroundImage:
+            'linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 70%)',
+        }}
+      />
+
       <div className="mx-auto w-full max-w-5xl px-4 py-20 text-center sm:px-6 md:py-24 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 24 }}

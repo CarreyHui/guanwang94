@@ -88,6 +88,7 @@ model SiteConfig {
   siteDescription String   @default("志存高远 · 脚踏实地 · 团结奋进 · 记录九四班每一次重要时刻")
   logoUrl         String?
   ogImageUrl      String?
+  themeColor      String   @default("emerald")
   updatedAt       DateTime @updatedAt
 }
 

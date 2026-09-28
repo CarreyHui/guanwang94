@@ -38,6 +38,7 @@ import type { Confession, ConfessionType, ConfessionColor } from '@/lib/types'
 import { relativeTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyState, CardSkeleton } from '@/components/empty-state'
+import { ConfessionTopBar } from './confession-top-bar'
 
 const MAX_CONTENT = 300
 
@@ -539,6 +540,9 @@ export function ConfessionSection() {
           表白 · 感谢 · 祝福 · 吐槽 · 心愿
         </p>
       </div>
+
+      {/* 热榜（近 7 天 Top 5） */}
+      <ConfessionTopBar />
 
       {/* 表单区 */}
       <div className="mb-6 rounded-xl border bg-card p-4 shadow-sm sm:p-5">

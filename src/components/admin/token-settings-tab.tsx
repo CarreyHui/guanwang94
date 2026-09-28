@@ -18,6 +18,7 @@ import {
   ImageIcon,
   Type,
   FileText,
+  Palette,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,6 +27,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { LazyImage } from '@/components/lazy-image'
+import { THEME_COLOR_OPTIONS } from '@/components/theme-color-applier'
+import { cn } from '@/lib/utils'
 import {
   getAccessToken,
   updateAccessToken,
@@ -95,6 +98,7 @@ export function TokenSettingsTab() {
   const [siteDescription, setSiteDescription] = React.useState('')
   const [logoUrl, setLogoUrl] = React.useState('')
   const [ogImageUrl, setOgImageUrl] = React.useState('')
+  const [themeColor, setThemeColor] = React.useState('emerald')
 
   // 数据加载后填充
   React.useEffect(() => {
@@ -103,6 +107,7 @@ export function TokenSettingsTab() {
       setSiteDescription(siteQuery.data.siteDescription)
       setLogoUrl(siteQuery.data.logoUrl)
       setOgImageUrl(siteQuery.data.ogImageUrl)
+      setThemeColor(siteQuery.data.themeColor || 'emerald')
     }
   }, [siteQuery.data])
 
@@ -113,10 +118,15 @@ export function TokenSettingsTab() {
         siteDescription,
         logoUrl,
         ogImageUrl,
+        themeColor,
       }),
     onSuccess: () => {
       toast.success('站点配置已保存')
       void queryClient.invalidateQueries({ queryKey: ['admin', 'site-config'] })
+      // 同步到 localStorage 让 ThemeColorApplier 立即生效
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('gw94_theme_color', themeColor)
+      }
     },
     onError: (err: unknown) => {
       toast.error(err instanceof Error ? err.message : '保存失败')
@@ -358,6 +368,40 @@ export function TokenSettingsTab() {
                   )}
                 </div>
               )}
+
+              {/* 主题色选择器 */}
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1">
+                  <Palette className="size-3.5" />
+                  站点主色调
+                </Label>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {THEME_COLOR_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setThemeColor(opt.value)}
+                      className={cn(
+                        'flex flex-col items-center gap-1.5 rounded-lg border p-2 transition-all hover:scale-105',
+                        themeColor === opt.value
+                          ? 'border-2 border-emerald-600 bg-emerald-600/5 shadow-sm'
+                          : 'border-border bg-card hover:border-emerald-600/30',
+                      )}
+                      aria-pressed={themeColor === opt.value}
+                      aria-label={opt.label}
+                    >
+                      <span
+                        className="size-7 rounded-full ring-2 ring-white/50 dark:ring-white/20"
+                        style={{ backgroundColor: opt.swatch }}
+                      />
+                      <span className="text-[11px] font-medium">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  保存后全站主色调立即生效（emerald 默认，6 种可选）。访客端下次访问时自动应用。
+                </p>
+              </div>
 
               <div className="flex justify-end">
                 <Button

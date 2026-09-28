@@ -406,3 +406,88 @@ Stage Summary:
 - 后台批量操作（多选事件批量删除/置顶/改分类）
 - 表白墙热榜（按周/月统计 top10 表白）
 - 访问统计的地理分布（基于 ipHash 不可逆 + 简单地理库）
+
+---
+Task ID: 8
+Agent: webDevReview 定时巡检 agent（第 4 轮）
+Task: QA + 自定义主题色 + URL 持久化 + 后台批量操作 + 表白墙热榜 + 404/Hero 样式增强
+
+Work Log:
+- 读 worklog 了解第 3 轮进度（PWA/动态 metadata/iCal/emoji 反应/阅读进度条全部完成）
+- 启动 dev server + 预热 + QA：主页正常 + console 无错误
+
+新增功能（5 项）：
+1. **自定义主题色**（runtime CSS 变量方案）：
+   - Prisma SiteConfig 加 themeColor 字段（默认 emerald，6 选 1）
+   - 新 API `/api/access/theme-color` GET 公开（需 access）返回当前主题色，前端首屏用
+   - site-config GET/PUT 加 themeColor 字段（白名单校验：emerald/teal/rose/amber/sky/violet）
+   - 新建 `src/components/theme-color-applier.tsx`：
+     - 6 种主题色完整调色板（light + dark 各 4 个变量：primary/ring/accent/chart-1）
+     - 启动时先读 localStorage 缓存应用避免闪烁，再 fetch 最新同步
+     - MutationObserver 监听 html class 变化（dark/light 切换时重新应用 dark 调色板）
+     - 导出 THEME_COLOR_OPTIONS 常量供后台选择器用
+   - layout.tsx 挂 `<ThemeColorApplier />`
+   - token-settings-tab 加主题色选择器：6 个色块按钮（hover 放大）+ 选中 emerald 边框 + 保存后写 localStorage
+
+2. **标签筛选 URL 持久化**（hash sync）：
+   - events-section state 初始化从 `window.location.hash` 读（c=category, q=query, t=tag, p=priority, s=sort, pi=pinnedOnly）
+   - 筛选变化时 useEffect 同步到 URL hash（`#events?c=...&t=...`）
+   - 监听 hashchange 事件（用户前进/后退）反向同步到 state
+   - URL 有筛选时 showAdvanced 自动展开
+   - 测试：点 #报名 标签 → URL 变 `#events?t=报名` ✓
+
+3. **后台批量操作**（manage-events-tab）：
+   - 加 selectedIds Set state + 4 个 helper（toggleSelect/toggleSelectAll/clearSelection）
+   - 表头加全选 Checkbox，每行加独立 Checkbox
+   - 选中时显示批量工具栏（emerald 边框 + 已选 N 条 + 4 按钮：批量置顶/取消置顶/批量删除/取消选择）
+   - batchPinMutation：拉每条当前状态，仅对「需要切换」的调 toggleEventPin（避免重复 toggle）
+   - batchDeleteMutation：Promise.all 并行删除，统计成功/失败数
+   - AlertDialog 批量确认弹窗（根据操作类型显示不同标题/描述/按钮颜色）
+   - 测试：全选 8 条 → 工具栏显示「已选 8 条」+ 4 按钮 ✓
+
+4. **表白墙热榜**（近 7 天 Top 5）：
+   - 新 API `/api/confessions/top` GET：查近 N 天（默认 7）按 likes+reactions 总数排序，返回 score 字段
+   - 前端 api.ts 加 `getConfessionTop` + `ConfessionTopItem` 类型
+   - 新建 `src/components/sections/confession-top-bar.tsx`：
+     - amber/orange/rose 渐变背景（dark mode 950 系）
+     - Flame 图标 + 「近 7 天热榜」徽章
+     - 5 列卡片网格（lg），Top 3 显示 Crown/Medal/Award 奖牌图标
+     - 每卡：排名 + 类型 emoji + 内容（line-clamp-3）+ 昵称 + 热度分（Flame + score）
+     - framer-motion 入场 + hover 上移
+   - confession-section 标题后挂 `<ConfessionTopBar />`
+   - 5 分钟 staleTime 缓存
+   - 测试：表白墙区显示「近 7 天热榜」+ Top 1「星辰」（score 25）✓
+
+5. **样式增强**：
+   - **404 页**：装饰光晕（emerald/amber/rose 3 个 blur 圆）+ 网格背景（透明度 3%/5%）+ Compass 图标卡 + 404 渐变文字（emerald→teal→amber）+ amber 圆点带 ping 动画
+   - **Hero**：3 个浮动光晕（emerald/amber/teal，不同 animationDelay）+ 网格背景（mask radial 渐变淡出）
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 表白墙热榜「近 7 天热榜」+ Top 1「星辰」显示 ✓
+  - 后台站点配置 6 主题色按钮显示 ✓，选「紫罗兰」+ 保存 + toast「站点配置已保存」✓
+  - 后台管理事件全选 Checkbox → 工具栏「已选 8 条」+ 4 批量按钮 ✓
+  - 事件标签云点 #报名 → URL hash 变 `#events?t=报名` ✓
+- 后端 API 测试：theme-color GET 200 ✓；site-config PUT 改 themeColor=violet 200 ✓；confessions/top GET 200 返回 score 排序 ✓
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 5 项新功能（主题色/URL 持久化/批量操作/热榜/样式增强）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 5 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 偶尔被清理（webpack 模式比 turbopack 稳）
+- 主题色 Applier 仅客户端运行，SSR 时用默认 emerald（首屏可能短暂闪烁，已用 localStorage 缓存缓解）
+- 批量操作 batchPinMutation 用 Promise.all 并行，若事件多可能短暂打满连接池（SQLite 单写者锁，但表白墙量小无影响）
+- 表白墙热榜 staleTime 5 分钟，新发布的表白不会立即进入热榜（可手动 invalidate）
+- URL hash sync 在 events-section 卸载时不清理 hash（用户切到其他 section 后 hash 保留，但无副作用）
+
+下一阶段优先事项建议：
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 后台批量改分类（除置顶/删除外的第 3 种批量操作）
+- 表白墙热榜时间维度切换（7 天/30 天/全部）
+- 事件详情 Modal 加「上一条/下一条」翻页
+- 访问统计的地理分布（基于 ipHash 不可逆 + 简单地理库）
+- 站点配置加自定义 CSS 主题色 hex 输入（不只 6 选 1）
