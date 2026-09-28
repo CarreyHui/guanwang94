@@ -223,6 +223,35 @@ export function updateAccessToken(token: string): Promise<AccessTokenUpdateRespo
   return apiPut<AccessTokenUpdateResponse>('/api/access/token', { token })
 }
 
+// ===== 站点配置（标题/描述/Logo/OG image） =====
+export interface SiteConfigResponse {
+  accessToken: string
+  siteTitle: string
+  siteDescription: string
+  logoUrl: string
+  ogImageUrl: string
+}
+
+export interface SiteConfigUpdateInput {
+  siteTitle?: string
+  siteDescription?: string
+  logoUrl?: string
+  ogImageUrl?: string
+}
+
+export function getSiteConfig(): Promise<SiteConfigResponse> {
+  return apiGet<SiteConfigResponse>('/api/access/site-config')
+}
+
+export function updateSiteConfig(
+  payload: SiteConfigUpdateInput,
+): Promise<SiteConfigResponse & { ok: true }> {
+  return apiPut<SiteConfigResponse & { ok: true }>(
+    '/api/access/site-config',
+    payload,
+  )
+}
+
 // ===== 鉴权 =====
 export function adminLogin(
   username: string,
@@ -244,6 +273,9 @@ export type EventListParams = {
   category?: string
   q?: string
   tag?: string
+  priority?: string
+  sort?: 'default' | 'latest' | 'oldest' | 'popular' | 'pinned'
+  pinnedOnly?: boolean
   page?: number
   pageSize?: number
 }
@@ -251,7 +283,16 @@ export type EventListParams = {
 export function listEvents(
   params: EventListParams = {},
 ): Promise<EventListResponse> {
-  return apiGet<EventListResponse>('/api/events', params)
+  const query: Record<string, QueryValue> = {}
+  if (params.category) query.category = params.category
+  if (params.q) query.q = params.q
+  if (params.tag) query.tag = params.tag
+  if (params.priority) query.priority = params.priority
+  if (params.sort) query.sort = params.sort
+  if (params.pinnedOnly) query.pinnedOnly = '1'
+  if (params.page) query.page = params.page
+  if (params.pageSize) query.pageSize = params.pageSize
+  return apiGet<EventListResponse>('/api/events', query)
 }
 
 export function getEvent(id: string): Promise<Event> {

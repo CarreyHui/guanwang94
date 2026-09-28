@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
     const category = url.searchParams.get('category') || ''
     const q = url.searchParams.get('q') || ''
     const tag = url.searchParams.get('tag') || ''
+    const priority = url.searchParams.get('priority') || ''
+    const sort = url.searchParams.get('sort') || 'default' // default | latest | oldest | popular | pinned
+    const pinnedOnly = url.searchParams.get('pinnedOnly') === '1'
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1)
     const pageSize = Math.max(1, Math.min(50, parseInt(url.searchParams.get('pageSize') || '12', 10) || 12))
 
@@ -26,12 +29,38 @@ export async function GET(req: NextRequest) {
     if (tag) {
       where.tags = { contains: tag }
     }
+    if (priority) {
+      where.priority = priority
+    }
+    if (pinnedOnly) {
+      where.pinned = { gt: 0 }
+    }
+
+    // orderBy
+    let orderBy: Prisma.EventOrderByWithRelationInput[] = []
+    switch (sort) {
+      case 'latest':
+        orderBy = [{ publishedAt: 'desc' }]
+        break
+      case 'oldest':
+        orderBy = [{ publishedAt: 'asc' }]
+        break
+      case 'popular':
+        orderBy = [{ viewCount: 'desc' }, { publishedAt: 'desc' }]
+        break
+      case 'pinned':
+        orderBy = [{ pinned: 'desc' }, { publishedAt: 'desc' }]
+        break
+      default:
+        // default：pinned 优先 + 最新
+        orderBy = [{ pinned: 'desc' }, { publishedAt: 'desc' }]
+    }
 
     const [total, items] = await Promise.all([
       db.event.count({ where }),
       db.event.findMany({
         where,
-        orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }],
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

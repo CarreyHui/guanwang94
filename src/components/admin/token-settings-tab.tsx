@@ -1,6 +1,6 @@
 // 九四班官网 - 管理后台「站点配置」
-// 显示当前访问令牌（GET /api/access/token）+ 修改表单（PUT /api/access/token）
-// 保存成功 toast：旧令牌已失效，所有客户端需重新输入
+// 1. 当前访问令牌 + 修改（GET/PUT /api/access/token）
+// 2. 站点 SEO 配置：站点标题/描述/Logo URL/OG image URL（GET/PUT /api/access/site-config）
 
 'use client'
 
@@ -14,13 +14,24 @@ import {
   RefreshCw,
   KeyRound,
   ShieldAlert,
+  Globe,
+  ImageIcon,
+  Type,
+  FileText,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getAccessToken, updateAccessToken } from '@/lib/api'
+import { Textarea } from '@/components/ui/textarea'
+import { LazyImage } from '@/components/lazy-image'
+import {
+  getAccessToken,
+  updateAccessToken,
+  getSiteConfig,
+  updateSiteConfig,
+} from '@/lib/api'
 import type { AccessTokenResponse } from '@/lib/types'
 
 export function TokenSettingsTab() {
@@ -72,6 +83,53 @@ export function TokenSettingsTab() {
 
   function handleRefresh() {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'access-token'] })
+  }
+
+  // ===== 站点 SEO 配置 =====
+  const siteQuery = useQuery({
+    queryKey: ['admin', 'site-config'],
+    queryFn: getSiteConfig,
+  })
+
+  const [siteTitle, setSiteTitle] = React.useState('')
+  const [siteDescription, setSiteDescription] = React.useState('')
+  const [logoUrl, setLogoUrl] = React.useState('')
+  const [ogImageUrl, setOgImageUrl] = React.useState('')
+
+  // 数据加载后填充
+  React.useEffect(() => {
+    if (siteQuery.data) {
+      setSiteTitle(siteQuery.data.siteTitle)
+      setSiteDescription(siteQuery.data.siteDescription)
+      setLogoUrl(siteQuery.data.logoUrl)
+      setOgImageUrl(siteQuery.data.ogImageUrl)
+    }
+  }, [siteQuery.data])
+
+  const siteSaveMut = useMutation({
+    mutationFn: () =>
+      updateSiteConfig({
+        siteTitle,
+        siteDescription,
+        logoUrl,
+        ogImageUrl,
+      }),
+    onSuccess: () => {
+      toast.success('站点配置已保存')
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'site-config'] })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : '保存失败')
+    },
+  })
+
+  function handleSaveSite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!siteTitle.trim()) {
+      toast.error('站点标题不能为空')
+      return
+    }
+    siteSaveMut.mutate()
   }
 
   return (
@@ -180,6 +238,150 @@ export function TokenSettingsTab() {
             保存后所有当前会话仍可继续访问，但新进入或刷新页面的同学需要输入新令牌。
             默认令牌是 <span className="font-mono font-bold">1234</span>。
           </p>
+        </CardContent>
+      </Card>
+
+      {/* 站点 SEO 配置 */}
+      <Card className="gap-2 py-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Globe className="size-4 text-emerald-600" />
+            站点 SEO 配置
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {siteQuery.isLoading ? (
+            <div className="flex h-12 items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> 加载中…
+            </div>
+          ) : siteQuery.isError ? (
+            <div className="text-sm text-rose-600">加载失败，请刷新重试</div>
+          ) : (
+            <form onSubmit={handleSaveSite} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="site-title" className="flex items-center gap-1">
+                  <Type className="size-3.5" />
+                  站点标题
+                </Label>
+                <Input
+                  id="site-title"
+                  value={siteTitle}
+                  onChange={(e) => setSiteTitle(e.target.value)}
+                  placeholder="九四班官网 · Guanwang94"
+                  className="h-11"
+                  maxLength={200}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  显示在浏览器标签和搜索结果标题中（≤200 字符）
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="site-desc" className="flex items-center gap-1">
+                  <FileText className="size-3.5" />
+                  站点描述
+                </Label>
+                <Textarea
+                  id="site-desc"
+                  value={siteDescription}
+                  onChange={(e) => setSiteDescription(e.target.value)}
+                  placeholder="志存高远 · 脚踏实地 · 团结奋进"
+                  className="min-h-[80px] resize-y"
+                  maxLength={500}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  用于搜索引擎和社交分享描述（≤500 字符）
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="logo-url" className="flex items-center gap-1">
+                    <ImageIcon className="size-3.5" />
+                    Logo URL（选填）
+                  </Label>
+                  <Input
+                    id="logo-url"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://…/logo.svg"
+                    className="h-11"
+                    type="url"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="og-url" className="flex items-center gap-1">
+                    <ImageIcon className="size-3.5" />
+                    OG 分享图 URL（选填）
+                  </Label>
+                  <Input
+                    id="og-url"
+                    value={ogImageUrl}
+                    onChange={(e) => setOgImageUrl(e.target.value)}
+                    placeholder="https://…/og.png（建议 1200×630）"
+                    className="h-11"
+                    type="url"
+                  />
+                </div>
+              </div>
+
+              {/* Logo 预览 */}
+              {(logoUrl || ogImageUrl) && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {logoUrl && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground">Logo 预览</p>
+                      <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border bg-muted">
+                        <LazyImage
+                          src={logoUrl}
+                          alt="Logo"
+                          aspectRatio="square"
+                          className="size-full"
+                          imgClassName="size-full object-contain p-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {ogImageUrl && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground">OG 分享图预览</p>
+                      <div className="aspect-[1.91/1] w-full max-w-[200px] overflow-hidden rounded-lg border bg-muted">
+                        <LazyImage
+                          src={ogImageUrl}
+                          alt="OG"
+                          aspectRatio="wide"
+                          className="size-full"
+                          imgClassName="size-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={siteSaveMut.isPending || !siteTitle.trim()}
+                  className="h-11 gap-1.5 bg-emerald-600 hover:bg-emerald-600/90"
+                >
+                  {siteSaveMut.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> 保存中…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="size-4" /> 保存配置
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                站点标题/描述影响浏览器标签、搜索引擎和社交分享展示。
+                Logo URL 会覆盖默认 favicon。OG 分享图建议 1200×630 像素。
+              </p>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -7,10 +7,9 @@
 
 import * as React from 'react'
 import {
-  useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
-  keepPreviousData,
 } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Trash2, Loader2, Send, MessageCircleHeart } from 'lucide-react'
@@ -270,18 +269,47 @@ export function ConfessionSection() {
   const [filterType, setFilterType] = React.useState<'all' | ConfessionType>('all')
   const [sort, setSort] = React.useState<'latest' | 'hot'>('latest')
 
-  // 列表 query
-  const listQuery = useQuery({
+  // 列表 query（无限滚动）
+  const listQuery = useInfiniteQuery({
     queryKey: ['confessions', filterType, sort],
-    queryFn: () =>
+    queryFn: ({ pageParam = 1 }) =>
       listConfessions({
         type: filterType === 'all' ? '' : filterType,
         sort,
-        pageSize: 50,
+        page: pageParam,
+        pageSize: 10,
       }),
     enabled: accessPassed,
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      // 还有下一页的条件：当前已加载的总数 < 总数
+      const loaded = last.page * last.pageSize
+      return loaded < last.total ? last.page + 1 : undefined
+    },
   })
+
+  // 自动加载更多（IntersectionObserver）
+  const loadMoreRef = React.useRef<HTMLButtonElement>(null)
+  const hasMore = listQuery.hasNextPage && !listQuery.isFetchingNextPage
+  React.useEffect(() => {
+    if (!hasMore) return
+    const el = loadMoreRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          listQuery.fetchNextPage()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, listQuery])
+
+  const allItems = React.useMemo(() => {
+    return listQuery.data?.pages.flatMap((p) => p.items) ?? []
+  }, [listQuery.data])
 
   // 发布 mutation
   const createMut = useMutation({
@@ -534,26 +562,53 @@ export function ConfessionSection() {
             </Button>
           }
         />
-      ) : (listQuery.data?.items ?? []).length === 0 ? (
+      ) : (listQuery.data?.pages[0]?.items.length ?? 0) === 0 ? (
         <EmptyState
           icon="heart"
           title="还没有表白，快来第一个发布吧"
           description="说出心里话，让同学们感受到你的心意"
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <AnimatePresence mode="popLayout">
-            {(listQuery.data?.items ?? []).map((c) => (
-              <ConfessionCard
-                key={c.id}
-                confession={c}
-                isAdmin={isAdmin}
-                onLike={(id) => likeMut.mutate(id)}
-                onDelete={(id) => deleteMut.mutate(id)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AnimatePresence mode="popLayout">
+              {allItems.map((c) => (
+                <ConfessionCard
+                  key={c.id}
+                  confession={c}
+                  isAdmin={isAdmin}
+                  onLike={(id) => likeMut.mutate(id)}
+                  onDelete={(id) => deleteMut.mutate(id)}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+          {/* 加载更多 / 无限滚动 */}
+          {hasMore ? (
+            <div className="mt-6 flex justify-center">
+              <Button
+                ref={loadMoreRef}
+                variant="outline"
+                size="sm"
+                onClick={() => listQuery.fetchNextPage()}
+                disabled={listQuery.isFetchingNextPage}
+                className="h-10 gap-2"
+              >
+                {listQuery.isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> 加载中…
+                  </>
+                ) : (
+                  <>加载更多</>
+                )}
+              </Button>
+            </div>
+          ) : allItems.length > 10 ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              — 已经到底啦，共 {allItems.length} 条 —
+            </p>
+          ) : null}
+        </>
       )}
     </section>
   )

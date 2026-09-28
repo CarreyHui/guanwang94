@@ -254,3 +254,72 @@ Stage Summary:
 - 后台「站点配置」Tab 扩展：站点标题/Logo/默认 SEO 字段（schema 已有 SiteConfig 表）
 - 访问统计的地理分布/UA 解析图表
 - 评论/留言的邮件通知（管理员有新留言时邮件提醒）
+
+---
+Task ID: 6
+Agent: webDevReview 定时巡检 agent（第 2 轮）
+Task: QA + 高级筛选 + 真分页 + 站点配置扩展 + UA 分布统计 + 错误边界
+
+Work Log:
+- 读 worklog 了解第 1 轮进度（核心功能 + 7 项增强全部完成）
+- 启动 dev server (webpack 模式) + 预热所有路由 + QA 自检：主页正常 + console 无错误
+- agent-browser QA 通过
+
+新增功能：
+1. **事件高级筛选**（events-section + api/events route）：
+   - 后端 `/api/events` 新增 3 个查询参数：`priority`（high/normal）、`sort`（default/latest/oldest/popular/pinned）、`pinnedOnly=1`
+   - 后端 orderBy 逻辑：latest→publishedAt desc，oldest→asc，popular→viewCount desc，pinned→pinned desc，default→pinned+publishedAt
+   - 前端 `api.ts` `listEvents` 加 `priority/sort/pinnedOnly` 参数
+   - 前端 `events-section` 工具栏加「高级」按钮（带未应用筛选数 badge）+ 可折叠 emerald 面板（motion 动画）：优先级 Select + 排序方式 Select + 只看置顶 toggle 开关（自定义 toggle UI）
+   - isFiltered/handleClearFilters 同步扩展
+
+2. **表白墙/留言真分页 + 无限滚动**（confession-section + message-section）：
+   - `useQuery(pageSize=50)` → `useInfiniteQuery(pageSize=10)` + `getNextPageParam`
+   - IntersectionObserver（rootMargin: 200px）自动触发 fetchNextPage
+   - 「加载更多」按钮（手动 fallback，loading 时 Loader2 旋转）
+   - 加载完后显示「— 已经到底啦，共 N 条 —」（仅当 allItems.length > 10）
+   - 修了 getNextPageParam bug：原 `next * pageSize >= total ? undefined` 在 total=14/pageSize=10/page=1 误判，改为 `loaded < total`（loaded = page * pageSize）
+
+3. **后台站点配置 Tab 扩展**（token-settings-tab + 新 API）：
+   - Prisma SiteConfig 模型加 4 个新字段：`siteTitle`、`siteDescription`、`logoUrl`、`ogImageUrl`（db:push 已同步）
+   - 新 API `/api/access/site-config` GET（取完整配置）/ PUT（更新 4 字段，校验非空 + 长度限制）
+   - 前端 `api.ts` 加 `getSiteConfig/updateSiteConfig` + 类型 `SiteConfigResponse/SiteConfigUpdateInput`
+   - token-settings-tab 加「站点 SEO 配置」Card：站点标题 Input + 站点描述 Textarea + Logo URL Input + OG 分享图 URL Input + 实时 Logo/OG 预览（LazyImage）+ 保存按钮 + emerald 提示框
+
+4. **访问统计 UA 解析 + 设备/浏览器/OS 分布**（dashboard-tab + lib/ua.ts）：
+   - 新建 `src/lib/ua.ts`：纯字符串 UA 解析（不依赖第三方库），识别 12 种浏览器（Chrome/Edge/Safari/Firefox/Opera/微信/QQ/UC/百度/搜狗/爬虫/其他）+ 11 种 OS（Windows 各版本/macOS/iOS/iPadOS/Android/Linux/ChromeOS/其他）+ 3 种设备（desktop/mobile/tablet）+ bot 检测
+   - `breakdownUA(visits)` 聚合返回 byDevice/byBrowser/byOS 三个数组（含 emerald/amber/sky 配色）
+   - dashboard-tab 加 3 列 Card 网格：设备分布（带 Monitor/Smartphone/Tablet 图标）+ 浏览器分布 + 操作系统分布，每行带颜色条形图（CSS 进度条）+ 计数/百分比
+
+5. **错误边界 + Loading**：
+   - 新建 `src/app/error.tsx`：全局运行时错误兜底（AlertTriangle + 重试 + 回首页 + digest + 开发模式错误堆栈 details）
+   - 新建 `src/app/loading.tsx`：路由级 loading（旋转 emerald 圈 + 中心「94」字）
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 高级筛选面板展开 ✓，优先级选「高优先级」生效 ✓
+  - 后台站点配置 Tab 显示「站点 SEO 配置」Card ✓，4 个字段填充现有数据（站点标题「九四班官网 · Guanwang94 V2」是我刚 PUT 的）✓
+  - 后台数据看板显示「设备分布 / 浏览器分布 / 操作系统分布」3 个 Card ✓（desktop / Chrome / 其他正确识别）
+  - 提交 8 条测试表白墙后，表白墙自动加载 page 2 + 显示「— 已经到底啦，共 15 条 —」✓
+- 后端 API 测试：events?priority=high / sort=popular / pinnedOnly=1 全部 200 + 返回正确数据；site-config GET/PUT 全部 200
+
+Stage Summary:
+- 项目当前状态：稳定，本轮 5 项新功能（高级筛选/真分页/站点配置扩展/UA 分布/错误边界）全部完成
+- 本轮目标：QA + 推进新功能 — 已完成
+- 验证结果：14 API + 12 前端交互 + 5 新功能点全部通过
+
+未解决问题/风险：
+- 沙箱 dev server 在 webpack 模式偶尔被沙箱清理，需 setsid -f + 间歇性重启保活
+- UA 解析是纯字符串匹配，部分国产浏览器（夸克/360/2345 等）可能识别为「其他」或 Chrome，未来可接入 ua-parser-js 库（增加 ~50KB bundle）
+- 站点配置的 siteTitle/siteDescription 目前只是后端存储，前端 layout.tsx metadata 是静态的（build 时生成）；动态化需要 layout 改为 generateMetadata + 数据库查询，但 Serverless 部署每次请求都查 DB 有性能开销，可后续做 ISR 或边缘缓存
+- 高级筛选面板在移动端窄屏可能挤压（已用 grid-cols-1 sm:grid-cols-3），实测 375 宽度 OK
+
+下一阶段优先事项建议：
+- PWA 离线支持（service worker + manifest 资源预缓存）—— 上轮已建议，仍未做
+- 站点配置动态化：layout 改 generateMetadata 从 DB 读 siteTitle/siteDescription（搭配 revalidate=3600 ISR）
+- 事件导出（PDF / iCal 日历）—— 同学校班级日历订阅
+- 留言邮件通知（管理员有新留言时邮件提醒）
+- 表白墙 emoji 反应扩展（不只 5 种 type，加 👍/❤️/🎉/🚀 等多反应）
+- 后台「站点配置」加自定义 CSS 主题色（让管理员改主色调，不只 emerald）

@@ -67,9 +67,13 @@ model Visit {
 }
 
 model SiteConfig {
-  id          String   @id @default("default")
-  accessToken String   @default("1234")
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default("default")
+  accessToken     String   @default("1234")
+  siteTitle       String   @default("九四班官网 · Guanwang94")
+  siteDescription String   @default("志存高远 · 脚踏实地 · 团结奋进 · 记录九四班每一次重要时刻")
+  logoUrl         String?
+  ogImageUrl      String?
+  updatedAt       DateTime @updatedAt
 }
 
 model AboutConfig {

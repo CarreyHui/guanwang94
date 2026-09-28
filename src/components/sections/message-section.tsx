@@ -10,10 +10,9 @@
 
 import * as React from 'react'
 import {
-  useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
-  keepPreviousData,
 } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -327,18 +326,46 @@ export function MessageSection() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // 列表 query
-  const listQuery = useQuery({
+  // 列表 query（无限滚动）
+  const listQuery = useInfiniteQuery({
     queryKey: ['messages', search, sort],
-    queryFn: () =>
+    queryFn: ({ pageParam = 1 }) =>
       listMessages({
         q: search,
         sort,
-        pageSize: 50,
+        page: pageParam,
+        pageSize: 10,
       }),
     enabled: accessPassed,
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) => {
+      const loaded = last.page * last.pageSize
+      return loaded < last.total ? last.page + 1 : undefined
+    },
   })
+
+  // 自动加载更多
+  const loadMoreRef = React.useRef<HTMLButtonElement>(null)
+  const hasMore = listQuery.hasNextPage && !listQuery.isFetchingNextPage
+  React.useEffect(() => {
+    if (!hasMore) return
+    const el = loadMoreRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          listQuery.fetchNextPage()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, listQuery])
+
+  const allMessages = React.useMemo(() => {
+    return listQuery.data?.pages.flatMap((p) => p.items) ?? []
+  }, [listQuery.data])
 
   // 创建留言
   const createMut = useMutation({
@@ -562,27 +589,54 @@ export function MessageSection() {
             </Button>
           }
         />
-      ) : (listQuery.data?.items ?? []).length === 0 ? (
+      ) : (listQuery.data?.pages[0]?.items.length ?? 0) === 0 ? (
         <EmptyState
           icon="message"
           title={search ? '没有符合条件的结果' : '还没有留言，快来第一个留言吧'}
           description={search ? '试试换个关键词' : '你的反馈是我们前进的动力'}
         />
       ) : (
-        <div className="grid gap-3">
-          <AnimatePresence mode="popLayout">
-            {(listQuery.data?.items ?? []).map((m) => (
-              <MessageCard
-                key={m.id}
-                message={m}
-                isAdmin={isAdmin}
-                onLike={(id) => likeMut.mutate(id)}
-                onDelete={(id) => deleteMut.mutate(id)}
-                onReply={(parentId, content) => replyMut.mutate({ parentId, content })}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        <>
+          <div className="grid gap-3">
+            <AnimatePresence mode="popLayout">
+              {allMessages.map((m) => (
+                <MessageCard
+                  key={m.id}
+                  message={m}
+                  isAdmin={isAdmin}
+                  onLike={(id) => likeMut.mutate(id)}
+                  onDelete={(id) => deleteMut.mutate(id)}
+                  onReply={(parentId, content) => replyMut.mutate({ parentId, content })}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+          {/* 加载更多 / 无限滚动 */}
+          {hasMore ? (
+            <div className="mt-6 flex justify-center">
+              <Button
+                ref={loadMoreRef}
+                variant="outline"
+                size="sm"
+                onClick={() => listQuery.fetchNextPage()}
+                disabled={listQuery.isFetchingNextPage}
+                className="h-10 gap-2"
+              >
+                {listQuery.isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> 加载中…
+                  </>
+                ) : (
+                  <>加载更多</>
+                )}
+              </Button>
+            </div>
+          ) : allMessages.length > 10 ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              — 已经到底啦，共 {allMessages.length} 条 —
+            </p>
+          ) : null}
+        </>
       )}
     </section>
   )

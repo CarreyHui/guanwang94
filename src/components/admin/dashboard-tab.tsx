@@ -12,6 +12,9 @@ import {
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,6 +29,10 @@ import {
   Loader2,
   TrendingUp,
   BarChart3,
+  Smartphone,
+  Monitor,
+  Tablet,
+  Globe,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,6 +52,7 @@ import {
 } from '@/lib/api'
 import type { OverviewStats, TrendPoint, TopEvent, Visit } from '@/lib/types'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { breakdownUA } from '@/lib/ua'
 import { cn } from '@/lib/utils'
 
 // ===== 数字卡片 =====
@@ -180,6 +188,8 @@ export function DashboardTab() {
   const trendData = trend.data ?? []
   const topData = topEvents.data ?? []
   const visits = recentVisits.data ?? []
+  const uaBreakdown = React.useMemo(() => breakdownUA(visits), [visits])
+  const uaTotal = visits.length || 1
 
   return (
     <div className="flex flex-col gap-5">
@@ -345,6 +355,94 @@ export function DashboardTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* 访客设备 / 浏览器 / 系统分布 */}
+      <section className="grid gap-3 lg:grid-cols-3">
+        {(() => {
+          const sections: Array<{
+            title: string
+            icon: React.ComponentType<{ className?: string }>
+            data: { name: string; count: number; color: string }[]
+            iconMap: Record<string, React.ComponentType<{ className?: string }>>
+          }> = [
+            {
+              title: '设备分布',
+              icon: Smartphone,
+              data: uaBreakdown.byDevice,
+              iconMap: { desktop: Monitor, mobile: Smartphone, tablet: Tablet },
+            },
+            {
+              title: '浏览器分布',
+              icon: Globe,
+              data: uaBreakdown.byBrowser,
+              iconMap: {},
+            },
+            {
+              title: '操作系统分布',
+              icon: Monitor,
+              data: uaBreakdown.byOS,
+              iconMap: {},
+            },
+          ]
+          return sections.map((sec) => (
+            <Card key={sec.title} className="gap-2 py-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <sec.icon className="size-4 text-emerald-600" />
+                  {sec.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {visits.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    暂无访问数据
+                  </p>
+                ) : sec.data.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    无法识别
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {sec.data.slice(0, 6).map((item) => {
+                      const pct = Math.round((item.count / uaTotal) * 100)
+                      const IconComp = sec.iconMap[item.name.toLowerCase()]
+                      return (
+                        <div key={item.name} className="flex items-center gap-2">
+                          <div className="flex w-20 shrink-0 items-center gap-1.5 text-xs">
+                            {IconComp ? (
+                              <IconComp
+                                className="size-3.5"
+                                // lucide-react 接受 style via SVGProps
+                                {...({ style: { color: item.color } } as Record<string, unknown>)}
+                              />
+                            ) : (
+                              <span
+                                className="inline-block size-2 rounded-full"
+                                style={{ backgroundColor: item.color }}
+                              />
+                            )}
+                            <span className="truncate font-medium">{item.name}</span>
+                          </div>
+                          <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-muted">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-md transition-all"
+                              style={{ width: `${pct}%`, backgroundColor: item.color }}
+                            />
+                            <span className="absolute inset-0 flex items-center justify-between px-2 text-[11px] font-medium text-foreground">
+                              <span className="opacity-0">.</span>
+                              <span>{item.count} · {pct}%</span>
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        })()}
+      </section>
 
       {/* 最近访问记录 */}
       <Card className="gap-2 py-4">

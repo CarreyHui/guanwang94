@@ -17,12 +17,25 @@ import {
   Tag as TagIcon,
   X,
   ArrowRight,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Flame,
+  Calendar,
+  TrendingUp,
 } from 'lucide-react'
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { LazyImage } from '@/components/lazy-image'
 import { useEventModal } from '@/store/use-event-modal'
 import { useAppStore } from '@/store/use-app-store'
@@ -258,6 +271,10 @@ export function EventsSection() {
   const [queryInput, setQueryInput] = React.useState('')
   const [query, setQuery] = React.useState('')
   const [activeTag, setActiveTag] = React.useState<string>('')
+  const [priority, setPriority] = React.useState<string>('all') // all | high | normal
+  const [sort, setSort] = React.useState<'default' | 'latest' | 'oldest' | 'popular' | 'pinned'>('default')
+  const [pinnedOnly, setPinnedOnly] = React.useState(false)
+  const [showAdvanced, setShowAdvanced] = React.useState(false)
 
   // debounce 300ms
   React.useEffect(() => {
@@ -294,20 +311,23 @@ export function EventsSection() {
 
   // ===== 卡片瀑布流（无限加载，过滤掉已展示的置顶事件）=====
   const cardsQuery = useInfiniteQuery({
-    queryKey: ['events-list', category, query, activeTag],
+    queryKey: ['events-list', category, query, activeTag, priority, sort, pinnedOnly],
     queryFn: ({ pageParam }) =>
       listEvents({
         category: category === '全部' ? '' : category,
         q: query,
         tag: activeTag,
+        priority: priority === 'all' ? '' : priority,
+        sort,
+        pinnedOnly,
         page: pageParam,
         pageSize: PAGE_SIZE,
       }),
     enabled: accessPassed,
     initialPageParam: 1,
     getNextPageParam: (last) => {
-      const next = last.page + 1
-      return next * PAGE_SIZE >= last.total ? undefined : next
+      const loaded = last.page * last.pageSize
+      return loaded < last.total ? last.page + 1 : undefined
     },
   })
 
@@ -326,12 +346,21 @@ export function EventsSection() {
 
   // 任何筛选变化都重置分页（useInfiniteQuery 的 queryKey 变更会自动重置）
   // 这里保证视觉上 page=1
-  const isFiltered = query !== '' || activeTag !== '' || category !== '全部'
+  const isFiltered =
+    query !== '' ||
+    activeTag !== '' ||
+    category !== '全部' ||
+    priority !== 'all' ||
+    sort !== 'default' ||
+    pinnedOnly
 
   function handleClearFilters() {
     setQueryInput('')
     setActiveTag('')
     setCategory('全部')
+    setPriority('all')
+    setSort('default')
+    setPinnedOnly(false)
   }
 
   return (
@@ -355,7 +384,7 @@ export function EventsSection() {
         </div>
       </div>
 
-      {/* 工具栏：搜索 + Tabs */}
+      {/* 工具栏：搜索 + Tabs + 高级筛选 */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -379,20 +408,124 @@ export function EventsSection() {
           )}
         </div>
 
-        <Tabs
-          value={category}
-          onValueChange={(v) => setCategory(v as EventCategory)}
-          className="w-full sm:w-auto"
-        >
-          <TabsList className="flex h-11 w-full flex-wrap justify-start sm:w-auto">
-            {CATEGORIES.map((c) => (
-              <TabsTrigger key={c} value={c} className="h-9 px-3 text-sm">
-                {c}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          {/* 高级筛选按钮 */}
+          <Button
+            type="button"
+            variant={showAdvanced || (priority !== 'all' || sort !== 'default' || pinnedOnly) ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="h-11 gap-1.5"
+          >
+            <SlidersHorizontal className="size-4" />
+            高级
+            {(priority !== 'all' || sort !== 'default' || pinnedOnly) && (
+              <span className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                {[priority !== 'all', sort !== 'default', pinnedOnly].filter(Boolean).length}
+              </span>
+            )}
+            {showAdvanced ? (
+              <ChevronUp className="size-3.5" />
+            ) : (
+              <ChevronDown className="size-3.5" />
+            )}
+          </Button>
+
+          <Tabs
+            value={category}
+            onValueChange={(v) => setCategory(v as EventCategory)}
+            className="w-full sm:w-auto"
+          >
+            <TabsList className="flex h-11 w-full flex-wrap justify-start sm:w-auto">
+              {CATEGORIES.map((c) => (
+                <TabsTrigger key={c} value={c} className="h-9 px-3 text-sm">
+                  {c}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {/* 高级筛选面板（可折叠） */}
+      {showAdvanced && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mb-4 overflow-hidden rounded-lg border border-emerald-600/20 bg-emerald-600/5 p-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* 优先级 */}
+            <div>
+              <label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Flame className="size-3.5" />
+                优先级
+              </label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="全部优先级" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部优先级</SelectItem>
+                  <SelectItem value="high">高优先级</SelectItem>
+                  <SelectItem value="normal">普通</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* 排序 */}
+            <div>
+              <label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                {sort === 'popular' ? <TrendingUp className="size-3.5" /> : <Calendar className="size-3.5" />}
+                排序方式
+              </label>
+              <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">默认（置顶优先）</SelectItem>
+                  <SelectItem value="latest">最新发布</SelectItem>
+                  <SelectItem value="oldest">最早发布</SelectItem>
+                  <SelectItem value="popular">最热浏览</SelectItem>
+                  <SelectItem value="pinned">仅看置顶</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* 置顶开关 */}
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => setPinnedOnly((v) => !v)}
+                className={cn(
+                  'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors',
+                  pinnedOnly
+                    ? 'border-emerald-600 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300'
+                    : 'border-border text-muted-foreground hover:bg-accent',
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Pin className="size-3.5" />
+                  只看置顶
+                </span>
+                <span
+                  className={cn(
+                    'relative h-5 w-9 rounded-full transition-colors',
+                    pinnedOnly ? 'bg-emerald-600' : 'bg-muted',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 size-4 rounded-full bg-white transition-transform',
+                      pinnedOnly ? 'translate-x-4' : 'translate-x-0.5',
+                    )}
+                  />
+                </span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* 标签云 */}
       {tagsQuery.data && tagsQuery.data.length > 0 && (
