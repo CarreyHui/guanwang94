@@ -90,6 +90,9 @@ model SiteConfig {
   ogImageUrl         String?
   themeColor         String   @default("emerald")
   customPrimaryColor String?
+  funUrl             String?
+  funTitle           String   @default("有趣功能")
+  funEnabled         Int      @default(0)
   updatedAt          DateTime @updatedAt
 }
 

@@ -7,6 +7,7 @@ import { Hero } from '@/components/hero'
 import { AccessGate } from '@/components/access-gate'
 import { ReadingProgress } from '@/components/reading-progress'
 import { AdminPanel } from '@/components/admin-panel'
+import { FunLinkButton } from '@/components/fun-link-button'
 import {
   EventsSection,
   GallerySection,
@@ -111,6 +112,7 @@ export default function Home() {
       <AccessGate />
       <EventDetailModal />
       {isAdmin && <AdminPanel />}
+      <FunLinkButton />
     </div>
   )
 }

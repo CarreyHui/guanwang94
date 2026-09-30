@@ -927,3 +927,77 @@ Stage Summary:
 - 后台批量操作加「批量删除标签」（除覆盖/追加外的第 3 种标签操作）
 - 表白墙热榜加「按周/月」分组（不只按天聚合）
 - 自定义主题色加「调色板生成器」（输入主色自动生成 5 级色阶）
+
+---
+Task ID: 15
+Agent: 主 agent（用户需求：修复 admin UI + 趣味跳转功能）
+Task: 修复管理员后台 UI 显示问题 + 新增「有趣功能」跳转页面机制
+
+Work Log:
+- 用户反馈：管理员后台 UI 显示不对 + 需要「主页有趣功能按钮跳转到后台配置的网址」
+- 用 VLM 分析 admin 截图发现：
+  - Dialog 高度超出视口，底部内容（趋势图、站点配置 nav）被截断
+  - 右侧内容区 overflow-y-auto 没生效
+  - 背景文字透出（blur 不够）
+- 根因：shadcn DialogContent 默认 `grid + sm:max-w-lg + gap-4 + p-6` 覆盖了我们的 flex/max-w-6xl/h-[90vh]/p-0/gap-0；且沙箱视口只有 577px，90vh=519px 装不下所有内容
+
+修复 admin-panel.tsx：
+- DialogContent 加 `!block !p-0 !gap-0 max-w-6xl w-[95vw] !max-h-[90vh] overflow-hidden` + style 双重覆盖 maxWidth/width/maxHeight/padding/overflow
+- 内部加一层 div 强制 flex flex-col + height:90vh + maxHeight:90vh
+- header 加 style flexShrink:0
+- 主体 div 加 style flex:1 + overflow:hidden + minHeight:0
+- 右侧内容区加 style flex:1 + overflowY:auto + minHeight:0
+- 验证：bodyScrollH=3323 > bodyClientH=463，滚动生效 ✓，VLM 确认滚动后能看到热力图/热门路径/访问时间分布等之前被截断的内容 ✓
+
+新增「有趣功能」跳转页面机制：
+1. **Prisma schema 扩展**：
+   - SiteConfig 加 funUrl(String?) + funTitle(String @default("有趣功能")) + funEnabled(Int @default(0))
+   - bun run db:push 同步
+2. **后端 API**：
+   - 新 API `/api/access/fun-link` GET（需 access）：返回 {enabled, url, title}
+   - site-config GET/PUT 加 funUrl/funTitle/funEnabled 字段
+   - PUT 校验：funUrl 必须 http:// 或 https:// 开头，funTitle ≤50 字符，funEnabled boolean
+3. **前端 api.ts**：
+   - SiteConfigResponse/SiteConfigUpdateInput 加 funUrl/funTitle/funEnabled
+   - 新增 getFunLink() + FunLinkResponse 类型
+4. **主页浮动按钮**（`src/components/fun-link-button.tsx`）：
+   - 调 getFunLink() 拉 funLink 配置
+   - enabled && url 时显示，点击 window.open(url, '_blank', 'noopener,noreferrer')
+   - 安全校验：仅允许 http/https
+   - amber→orange→rose 渐变 pill 按钮 + Sparkles 图标 + 闪烁 ping 装饰 + ExternalLink 图标
+   - framer-motion spring 入场 + hover scale 1.05 + tap scale 0.95
+   - 固定 bottom-6 left-6 z-40
+5. **后台配置 UI**（token-settings-tab）：
+   - 新增「趣味跳转（主页浮动按钮）」Card（amber 边框 + Sparkles 图标）
+   - 启用开关（自定义 toggle，amber 选中态）
+   - 按钮标题 Input（≤50 字符）+ 跳转网址 Input（type=url，≤500 字符）
+   - 实时预览（amber→orange→rose 渐变 pill + 标题 + URL code）
+   - 保存后主页浮动按钮立即生效
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - admin Dialog 滚动修复：bodyScrollH=3323 > bodyClientH=463，滚动可见底部内容 ✓
+  - 主页浮动按钮「班级相册」显示在左下角（VLM 确认 amber→rose 渐变 pill）✓
+  - 后台站点配置「趣味跳转」Card + 启用开关 + 按钮标题/跳转网址 Input + 预览 ✓
+- 后端 API 测试：
+  - fun-link GET 未配置时 {enabled:false,url:"",title:"有趣功能"} ✓
+  - site-config PUT 配置 funEnabled:true/funTitle:"班级相册"/funUrl:"https://example.com/class-album" 200 ✓
+  - fun-link GET 配置后 {enabled:true,url:"https://example.com/class-album",title:"班级相册"} ✓
+
+Stage Summary:
+- 修复了管理员后台 UI 滚动问题（shadcn DialogContent 默认类覆盖 + 沙箱小视口）
+- 新增「有趣功能」跳转机制：管理员在后台配置 URL + 标题 + 开关 → 主页显示浮动按钮 → 点击在新标签页打开
+- 验证结果：admin UI 滚动正常 + 浮动按钮显示 + 配置 UI 完整 + 3 个 API 全部工作
+
+未解决问题/风险：
+- 沙箱视口只有 577px（90vh=519px），admin Dialog 在更大屏幕上会显示更完整
+- 浮动按钮在移动端可能与「返回顶部」按钮（右下角）位置不冲突（一个左下角一个右下角，OK）
+- funUrl 校验仅允许 http/https，防止 javascript: 注入
+- window.open 在某些浏览器弹窗拦截器下可能被拦（用户需允许弹窗）
+
+下一阶段优先事项建议：
+- 继续之前的 webDevReview 待办：留言邮件通知、PWA 后台同步、原生分享等
+- 趣味跳转可扩展：支持多个趣味链接（不只一个）
+- 后台可加「趣味跳转点击统计」（记录点击次数）

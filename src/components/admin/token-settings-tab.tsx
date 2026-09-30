@@ -19,6 +19,7 @@ import {
   Type,
   FileText,
   Palette,
+  Sparkles,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -100,6 +101,9 @@ export function TokenSettingsTab() {
   const [ogImageUrl, setOgImageUrl] = React.useState('')
   const [themeColor, setThemeColor] = React.useState('emerald')
   const [customPrimaryColor, setCustomPrimaryColor] = React.useState('')
+  const [funUrl, setFunUrl] = React.useState('')
+  const [funTitle, setFunTitle] = React.useState('有趣功能')
+  const [funEnabled, setFunEnabled] = React.useState(false)
 
   // 数据加载后填充
   React.useEffect(() => {
@@ -110,6 +114,9 @@ export function TokenSettingsTab() {
       setOgImageUrl(siteQuery.data.ogImageUrl)
       setThemeColor(siteQuery.data.themeColor || 'emerald')
       setCustomPrimaryColor(siteQuery.data.customPrimaryColor || '')
+      setFunUrl(siteQuery.data.funUrl || '')
+      setFunTitle(siteQuery.data.funTitle || '有趣功能')
+      setFunEnabled(siteQuery.data.funEnabled ?? false)
     }
   }, [siteQuery.data])
 
@@ -122,6 +129,9 @@ export function TokenSettingsTab() {
         ogImageUrl,
         themeColor,
         customPrimaryColor,
+        funUrl,
+        funTitle,
+        funEnabled,
       }),
     onSuccess: () => {
       toast.success('站点配置已保存')
@@ -456,6 +466,83 @@ export function TokenSettingsTab() {
                 <p className="text-[11px] text-muted-foreground">
                   填写合法 hex 颜色（如 <code className="font-mono">#10b981</code>）会覆盖上方预设主色调。留空则使用预设。
                 </p>
+              </div>
+
+              {/* 趣味跳转配置 */}
+              <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <Label className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                  <Sparkles className="size-3.5" />
+                  趣味跳转（主页浮动按钮）
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  设置后，主页左下角会显示一个浮动按钮，点击在新标签页打开你配置的网址。可用于跳转班级相册、外部活动页等。
+                </p>
+
+                {/* 开关 */}
+                <div className="flex items-center justify-between rounded-md bg-card/50 px-3 py-2">
+                  <span className="text-sm font-medium">启用趣味跳转</span>
+                  <button
+                    type="button"
+                    onClick={() => setFunEnabled((v) => !v)}
+                    aria-pressed={funEnabled}
+                    className={cn(
+                      'relative h-6 w-11 rounded-full transition-colors',
+                      funEnabled ? 'bg-amber-500' : 'bg-muted',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'absolute top-0.5 size-5 rounded-full bg-white transition-transform',
+                        funEnabled ? 'translate-x-5' : 'translate-x-0.5',
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* 标题 + URL */}
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="fun-title" className="text-[11px] text-muted-foreground">
+                      按钮标题
+                    </Label>
+                    <Input
+                      id="fun-title"
+                      value={funTitle}
+                      onChange={(e) => setFunTitle(e.target.value)}
+                      placeholder="有趣功能"
+                      className="h-10"
+                      maxLength={50}
+                      disabled={!funEnabled}
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label htmlFor="fun-url" className="text-[11px] text-muted-foreground">
+                      跳转网址（必须 http:// 或 https:// 开头）
+                    </Label>
+                    <Input
+                      id="fun-url"
+                      value={funUrl}
+                      onChange={(e) => setFunUrl(e.target.value)}
+                      placeholder="https://example.com/class-album"
+                      className="h-10"
+                      type="url"
+                      maxLength={500}
+                      disabled={!funEnabled}
+                    />
+                  </div>
+                </div>
+
+                {/* 预览 */}
+                {funEnabled && funUrl && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md bg-card/60 px-2.5 py-1.5">
+                    <span className="text-[11px] text-muted-foreground">预览：</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-2.5 py-0.5 text-[11px] font-bold text-white">
+                      <Sparkles className="size-3" />
+                      {funTitle || '有趣功能'}
+                    </span>
+                    <code className="truncate text-[10px] text-muted-foreground">{funUrl}</code>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end">

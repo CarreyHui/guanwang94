@@ -223,7 +223,7 @@ export function updateAccessToken(token: string): Promise<AccessTokenUpdateRespo
   return apiPut<AccessTokenUpdateResponse>('/api/access/token', { token })
 }
 
-// ===== 站点配置（标题/描述/Logo/OG image/主题色） =====
+// ===== 站点配置（标题/描述/Logo/OG image/主题色/趣味跳转） =====
 export interface SiteConfigResponse {
   accessToken: string
   siteTitle: string
@@ -232,6 +232,9 @@ export interface SiteConfigResponse {
   ogImageUrl: string
   themeColor: string
   customPrimaryColor: string
+  funUrl: string
+  funTitle: string
+  funEnabled: boolean
 }
 
 export interface SiteConfigUpdateInput {
@@ -241,6 +244,9 @@ export interface SiteConfigUpdateInput {
   ogImageUrl?: string
   themeColor?: string
   customPrimaryColor?: string
+  funUrl?: string
+  funTitle?: string
+  funEnabled?: boolean
 }
 
 export function getSiteConfig(): Promise<SiteConfigResponse> {
@@ -254,6 +260,17 @@ export function updateSiteConfig(
     '/api/access/site-config',
     payload,
   )
+}
+
+// 趣味跳转链接（公开，需 access）
+export interface FunLinkResponse {
+  enabled: boolean
+  url: string
+  title: string
+}
+
+export function getFunLink(): Promise<FunLinkResponse> {
+  return apiGet<FunLinkResponse>('/api/access/fun-link')
 }
 
 // ===== 鉴权 =====
