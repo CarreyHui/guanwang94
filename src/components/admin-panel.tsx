@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   GraduationCap,
+  Sparkles,
 } from 'lucide-react'
 
 import {
@@ -29,6 +30,7 @@ import { PublishFormTab } from '@/components/admin/publish-form-tab'
 import { ManageEventsTab } from '@/components/admin/manage-events-tab'
 import { ManageMessagesTab } from '@/components/admin/manage-messages-tab'
 import { ManageConfessionsTab } from '@/components/admin/manage-confessions-tab'
+import { FunLinksTab } from '@/components/admin/fun-links-tab'
 import { TokenSettingsTab } from '@/components/admin/token-settings-tab'
 
 interface NavItem {
@@ -43,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { tab: 'events', label: '管理事件', icon: ListChecks },
   { tab: 'messages', label: '管理留言', icon: MessageSquare },
   { tab: 'confessions', label: '管理表白墙', icon: Heart },
+  { tab: 'funlinks', label: '趣味跳转', icon: Sparkles },
   { tab: 'token', label: '站点配置', icon: Settings },
 ]
 
@@ -59,11 +62,11 @@ export function AdminPanel() {
         showCloseButton={false}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
-        className="!block !p-0 !gap-0 max-w-6xl w-[95vw] !max-h-[90vh] overflow-hidden rounded-xl sm:rounded-2xl"
-        style={{ maxWidth: '72rem', width: '95vw', maxHeight: '90vh', padding: 0, overflow: 'hidden' }}
+        className="!block !p-0 !gap-0 max-w-6xl w-[95vw] !max-h-[85vh] sm:!max-h-[90vh] overflow-hidden rounded-xl sm:rounded-2xl"
+        style={{ maxWidth: '72rem', width: '95vw', maxHeight: '85vh', padding: 0, overflow: 'hidden' }}
       >
         {/* 内部 flex 容器，强制高度 */}
-        <div className="flex h-full max-h-[90vh] flex-col" style={{ height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="flex h-full max-h-[85vh] flex-col sm:max-h-[90vh]" style={{ height: '85vh', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
           {/* 顶部 Header */}
           <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-emerald-600/15 bg-emerald-600/5 px-4 sm:px-6" style={{ flexShrink: 0 }}>
             <div className="flex items-center gap-2.5">
@@ -130,6 +133,7 @@ export function AdminPanel() {
             {activeTab === 'events' && <ManageEventsTab />}
             {activeTab === 'messages' && <ManageMessagesTab />}
             {activeTab === 'confessions' && <ManageConfessionsTab />}
+            {activeTab === 'funlinks' && <FunLinksTab />}
             {activeTab === 'token' && <TokenSettingsTab />}
             </div>
           </div>

@@ -223,7 +223,7 @@ export function updateAccessToken(token: string): Promise<AccessTokenUpdateRespo
   return apiPut<AccessTokenUpdateResponse>('/api/access/token', { token })
 }
 
-// ===== 站点配置（标题/描述/Logo/OG image/主题色/趣味跳转） =====
+// ===== 站点配置（标题/描述/Logo/OG image/主题色） =====
 export interface SiteConfigResponse {
   accessToken: string
   siteTitle: string
@@ -232,9 +232,6 @@ export interface SiteConfigResponse {
   ogImageUrl: string
   themeColor: string
   customPrimaryColor: string
-  funUrl: string
-  funTitle: string
-  funEnabled: boolean
 }
 
 export interface SiteConfigUpdateInput {
@@ -244,9 +241,6 @@ export interface SiteConfigUpdateInput {
   ogImageUrl?: string
   themeColor?: string
   customPrimaryColor?: string
-  funUrl?: string
-  funTitle?: string
-  funEnabled?: boolean
 }
 
 export function getSiteConfig(): Promise<SiteConfigResponse> {
@@ -262,15 +256,44 @@ export function updateSiteConfig(
   )
 }
 
-// 趣味跳转链接（公开，需 access）
-export interface FunLinkResponse {
-  enabled: boolean
-  url: string
+// 趣味跳转磁贴（多个，支持 CRUD）
+export interface FunLinkItem {
+  id: string
   title: string
+  url: string
+  description: string | null
+  icon: string
+  color: string
+  order: number
+  enabled: number
+  createdAt: string
+  updatedAt: string
 }
 
-export function getFunLink(): Promise<FunLinkResponse> {
-  return apiGet<FunLinkResponse>('/api/access/fun-link')
+export interface FunLinkInput {
+  title: string
+  url: string
+  description?: string
+  icon?: string
+  color?: string
+  order?: number
+  enabled?: boolean
+}
+
+export function listFunLinks(): Promise<{ items: FunLinkItem[] }> {
+  return apiGet<{ items: FunLinkItem[] }>('/api/fun-links')
+}
+
+export function createFunLink(payload: FunLinkInput): Promise<FunLinkItem> {
+  return apiPost<FunLinkItem>('/api/fun-links', payload)
+}
+
+export function updateFunLink(id: string, payload: Partial<FunLinkInput>): Promise<FunLinkItem> {
+  return apiPut<FunLinkItem>(`/api/fun-links/${encodeURIComponent(id)}`, payload)
+}
+
+export function deleteFunLink(id: string): Promise<OkResponse> {
+  return apiDelete<OkResponse>(`/api/fun-links/${encodeURIComponent(id)}`)
 }
 
 // ===== 鉴权 =====

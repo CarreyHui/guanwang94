@@ -1001,3 +1001,79 @@ Stage Summary:
 - 继续之前的 webDevReview 待办：留言邮件通知、PWA 后台同步、原生分享等
 - 趣味跳转可扩展：支持多个趣味链接（不只一个）
 - 后台可加「趣味跳转点击统计」（记录点击次数）
+
+---
+Task ID: 16
+Agent: 主 agent（用户需求：趣味跳转改为磁贴 + 手机适配）
+Task: 重构趣味跳转为独立磁贴 Section + 多链接 CRUD + 全面手机端适配
+
+Work Log:
+- 用户需求：趣味跳转不是浮动按钮风格，要单独一栏磁贴风格，用于后期多网站跳转；全面适配不同手机
+- 删旧 fun-link-button.tsx + 删旧 fun-link API + 删旧 site-config fun 字段
+
+重构为磁贴 Section + 多链接 CRUD：
+1. **Prisma schema**：
+   - 删 SiteConfig 的 funUrl/funTitle/funEnabled
+   - 新增 FunLink 表：id/title/url/description/icon/color/order/enabled/createdAt/updatedAt
+   - bun run db:push 同步
+2. **后端 API**：
+   - `/api/fun-links` GET（公开，需 access）：返回 enabled=1 的磁贴，按 order 排序
+   - `/api/fun-links` POST（管理员）：创建磁贴，校验 URL http/https + icon/color 白名单
+   - `/api/fun-links/[id]` PUT（管理员）：更新磁贴
+   - `/api/fun-links/[id]` DELETE（管理员）：删除磁贴
+3. **前端 api.ts**：
+   - 加 FunLinkItem/FunLinkInput 类型
+   - 加 listFunLinks/createFunLink/updateFunLink/deleteFunLink 函数
+   - 删旧 FunLinkResponse/getFunLink
+4. **主页磁贴 Section**（`src/components/sections/fun-links-section.tsx`）：
+   - 独立 section id="fun-links"，放在 Hero 后、Events 前
+   - 标题「更多精彩」+「Fun Links · 趣味跳转」徽章
+   - 磁贴网格：手机 2 列 gap-3 / 平板 3 列 gap-4 / 桌面 4 列
+   - 每磁贴 aspect-square + 渐变背景（7 色可选）+ icon + title + description
+   - 18 个 lucide icon 可选（Sparkles/Link/Star/Heart/Globe/Rocket/BookOpen/Camera/Music/Gamepad2/Palette/GraduationCap/Trophy/Gift/Coffee/Sun/Moon/Cloud）
+   - 7 色渐变（amber/rose/sky/teal/violet/emerald/orange）
+   - 点击 window.open(url, '_blank', 'noopener,noreferrer')
+   - framer-motion 入场 + whileHover y:-4 scale:1.02 + whileTap scale:0.98
+   - hover 显示 ExternalLink 图标
+   - 背景装饰光晕
+5. **后台「趣味跳转」Tab**（`src/components/admin/fun-links-tab.tsx`）：
+   - use-admin-panel AdminTab 加 'funlinks'
+   - admin-panel.tsx NAV_ITEMS 加「趣味跳转」+ Sparkles 图标
+   - CRUD 磁贴：网格预览（aspect-square 渐变磁贴 + 编辑/删除按钮 + 启用 Switch）
+   - 编辑 Dialog：标题/URL/描述/icon Select/color Select/顺序/启用 Switch + 实时预览
+   - 删除 AlertDialog 确认
+   - toggleEnabledMut 一键切换启用
+6. **手机端适配**：
+   - Hero min-h-[60vh] sm:min-h-[70vh] lg:min-h-[78vh]（手机 60vh，桌面 78vh）
+   - admin-panel Dialog max-h-[85vh] sm:max-h-[90vh]（手机 85vh 留地址栏空间）
+   - 磁贴网格手机 2 列 gap-3（磁贴约 170px 宽，触摸友好）
+   - 磁贴 aspect-square 自适应
+   - VLM 确认：手机端 2 列 side-by-side + 触摸友好 + 文字可读 ✓
+
+校验：
+- `bun run lint`：0 错误 0 警告
+- `bunx tsc --noEmit`：0 错误
+- agent-browser 端到端验证：
+  - 主页「更多精彩」section 显示 2 个磁贴（班级相册 rose 渐变 + 学习资源 sky 渐变）✓
+  - 后台「趣味跳转」Tab + 磁贴列表 + 编辑 Dialog + 启用 Switch ✓
+  - VLM 确认磁贴设计：rose 渐变 + Camera 图标 + sky 渐变 + BookOpen 图标 ✓
+  - VLM 确认手机端 2 列布局 + 触摸友好 ✓
+- 后端 API 测试：fun-links GET 空列表 → POST 创建 2 个 → GET 返回 2 个按 order 排序 ✓
+
+Stage Summary:
+- 趣味跳转从浮动按钮重构为独立磁贴 Section（grid 布局）
+- 支持多个链接 CRUD（后台「趣味跳转」Tab 管理）
+- 手机端适配：Hero/admin/磁贴网格全部响应式
+- 验证结果：主页磁贴显示 + 后台 CRUD + 手机 2 列布局 + 7 色渐变 + 18 图标可选
+
+未解决问题/风险：
+- 后台 listFunLinks 用公开接口（仅 enabled=1），admin 看不到 disabled 的磁贴（可加 admin 专用 list all 接口）
+- 磁贴顺序通过 order 字段手动设置（未来可加拖拽排序）
+- 磁贴点击统计未做（未来可加 click count）
+- 手机端编辑 Dialog 用 sm:max-w-md，在 375px 屏是全宽 OK
+
+下一阶段优先事项建议：
+- admin 专用 list all fun-links（含 disabled）
+- 磁贴拖拽排序（用 dnd-kit）
+- 磁贴点击统计
+- 继续之前的 webDevReview 待办：留言邮件通知、PWA 后台同步等

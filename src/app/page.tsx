@@ -7,7 +7,6 @@ import { Hero } from '@/components/hero'
 import { AccessGate } from '@/components/access-gate'
 import { ReadingProgress } from '@/components/reading-progress'
 import { AdminPanel } from '@/components/admin-panel'
-import { FunLinkButton } from '@/components/fun-link-button'
 import {
   EventsSection,
   GallerySection,
@@ -16,6 +15,7 @@ import {
   ArchiveSection,
   AboutSection,
   EventDetailModal,
+  FunLinksSection,
 } from '@/components/sections'
 import { useAppStore } from '@/store/use-app-store'
 import { useEventModal } from '@/store/use-event-modal'
@@ -80,6 +80,7 @@ export default function Home() {
         {/* 门控未通过时只显示 Hero，下方内容隐藏避免泄露 */}
         {accessPassed ? (
           <>
+            <FunLinksSection />
             <EventsSection />
             <GallerySection />
             <ConfessionSection />
@@ -112,7 +113,6 @@ export default function Home() {
       <AccessGate />
       <EventDetailModal />
       {isAdmin && <AdminPanel />}
-      <FunLinkButton />
     </div>
   )
 }

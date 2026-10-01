@@ -20,9 +20,6 @@ export async function GET(req: NextRequest) {
       ogImageUrl: config?.ogImageUrl || '',
       themeColor: config?.themeColor || 'emerald',
       customPrimaryColor: config?.customPrimaryColor || '',
-      funUrl: config?.funUrl || '',
-      funTitle: config?.funTitle || '有趣功能',
-      funEnabled: (config?.funEnabled ?? 0) > 0,
     })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)
@@ -37,9 +34,9 @@ export async function PUT(req: NextRequest) {
       return json({ error: admin.message }, admin.status)
     }
     const body = await req.json().catch(() => ({}))
-    const { siteTitle, siteDescription, logoUrl, ogImageUrl, themeColor, customPrimaryColor, funUrl, funTitle, funEnabled } = body || {}
+    const { siteTitle, siteDescription, logoUrl, ogImageUrl, themeColor, customPrimaryColor } = body || {}
 
-    const data: Record<string, string | number | null> = {}
+    const data: Record<string, string | null> = {}
     if (typeof siteTitle === 'string' && siteTitle.trim()) {
       data.siteTitle = siteTitle.trim().slice(0, 200)
     }
@@ -65,21 +62,6 @@ export async function PUT(req: NextRequest) {
         data.customPrimaryColor = null
       }
     }
-    // 趣味跳转链接配置
-    if (typeof funUrl === 'string') {
-      const trimmed = funUrl.trim()
-      if (trimmed === '') {
-        data.funUrl = null
-      } else if (/^https?:\/\//.test(trimmed)) {
-        data.funUrl = trimmed.slice(0, 500)
-      }
-    }
-    if (typeof funTitle === 'string') {
-      data.funTitle = funTitle.trim().slice(0, 50) || '有趣功能'
-    }
-    if (typeof funEnabled === 'boolean') {
-      data.funEnabled = funEnabled ? 1 : 0
-    }
 
     const updated = await db.siteConfig.upsert({
       where: { id: 'default' },
@@ -98,9 +80,6 @@ export async function PUT(req: NextRequest) {
       ogImageUrl: updated.ogImageUrl,
       themeColor: updated.themeColor,
       customPrimaryColor: updated.customPrimaryColor,
-      funUrl: updated.funUrl,
-      funTitle: updated.funTitle,
-      funEnabled: (updated.funEnabled ?? 0) > 0,
     })
   } catch (e: any) {
     return json({ error: e?.message || '服务器错误' }, 500)

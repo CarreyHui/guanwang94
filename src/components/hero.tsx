@@ -127,7 +127,7 @@ export function Hero() {
   return (
     <section
       id="hero"
-      className="relative isolate flex min-h-[78vh] items-center justify-center overflow-hidden"
+      className="relative isolate flex min-h-[60vh] items-center justify-center overflow-hidden sm:min-h-[70vh] lg:min-h-[78vh]"
     >
       {/* 背景图（视差） */}
       <div

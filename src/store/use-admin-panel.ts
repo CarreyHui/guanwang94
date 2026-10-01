@@ -11,6 +11,7 @@ export type AdminTab =
   | 'events'
   | 'messages'
   | 'confessions'
+  | 'funlinks'
   | 'token'
 
 export interface AdminPanelState {
